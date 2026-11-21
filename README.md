@@ -36,8 +36,8 @@ Node). [VPN](extensions/vpn) requires `git submodule update --init --recursive` 
 ## Screenshots
 
 `scripts/capture-ui.mjs` takes the images in `docs/` from a running Ultimate through the Chrome DevTools Protocol: it
-opens a page, clicks each surface in the top navigation, crops the left sidebar away (so private branch and
-conversation names stay out) and writes the PNGs. Run it against a checkout you can look at:
+opens a page and captures only Files/Terminal, cropping the left sidebar and status line away so private branch,
+conversation and quota/cost data stay out. Quota screenshots are not generated or tracked. Run it against a checkout you can look at:
 
 ```sh
 node scripts/capture-ui.mjs http://127.0.0.1:4747 docs

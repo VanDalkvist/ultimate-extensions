@@ -32,7 +32,7 @@ test('missing files are explicit and can never be opened',async()=>{
 test('file opening is fixed-target, shell-free and only dispatches native editor; no arbitrary path',async()=>{
   const calls:unknown[]=[]
   const exec=async(command:string,args:string[],options:unknown)=>{calls.push({command,args,options})}
-  await openSettings({file:'daemon'},paths,exists,exec)
+  await openSettings({file:'daemon'},paths,exists,exec,{platform:'darwin',editor:'Zed'})
   assert.deepEqual(calls,[{command:'/usr/bin/open',args:['-a','Zed',paths.daemon],options:{timeout:5000}}])
   for(const arg of [null,{}, {file:'other'}, {file:'daemon',path:'/etc/passwd'}])
     await assert.rejects(openSettings(arg,paths,exists,exec))
@@ -42,7 +42,7 @@ test('file opening is fixed-target, shell-free and only dispatches native editor
 test('native editor launch failure has safe actionable error and is not reported as opened',async()=>{
   await assert.rejects(openSettings({file:'connection'},paths,exists,async()=>{throw Error('private-detail')}),error=>{
     assert.ok(error instanceof Error)
-    assert.match(error.message,/Zed/);assert.ok(!error.message.includes('private-detail'))
+    assert.match(error.message,/приложении/);assert.ok(!error.message.includes('private-detail'))
     return true
   })
 })

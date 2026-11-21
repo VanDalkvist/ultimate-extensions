@@ -6,6 +6,7 @@ import { StatusPopoverTrigger } from '@/components/ui/status-trigger.solid.tsx'
 import { defineWebExtension, events, useEvent } from '@/sdk/solid'
 import { VpnPanel } from './panel.solid.tsx'
 import { useVpn } from './readers.solid.tsx'
+import { modeLabel } from './presentation.ts'
 
 function VpnChip() {
   const [open, setOpen] = createSignal(false)
@@ -13,10 +14,11 @@ function VpnChip() {
   useEvent('vpn:open', () => setOpen(true))
   const flag = () => vpn.status.data()?.activeProxy?.match(/\p{Regional_Indicator}{2}/u)?.[0]
   const label = () => {
-    if (vpn.problem()) return 'VPN · нет данных'
-    if (!vpn.status.data()) return 'VPN · …'
-    if (!vpn.status.data()?.enabled) return 'VPN выкл'
-    return ['VPN', flag(), vpn.status.data()?.activeDelay ? `${vpn.status.data()?.activeDelay} ms` : null].filter(Boolean).join(' · ')
+    if (vpn.problem()) return 'Mihomo · нет данных'
+    if (!vpn.status.data()) return 'Mihomo · …'
+    const mode = vpn.status.data()?.mode
+    if (mode === 'direct') return modeLabel(mode)
+    return [modeLabel(mode), flag(), vpn.status.data()?.activeDelay ? `${vpn.status.data()?.activeDelay} ms` : null].filter(Boolean).join(' · ')
   }
   return (
     <Popover onOpenChange={setOpen} open={open()}>

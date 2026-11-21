@@ -1,5 +1,7 @@
 # VPN snapshot publication
 
+Historical publication checkpoint. The subsequent five-finding remediation (licensing, mode-only UI, portable settings, quota-image removal and runtime symlink migration) is tracked in [vpn-five-findings.md](vpn-five-findings.md).
+
 ## Scope
 Publish the sanitized VPN snapshot under extensions/vpn, without importing the standalone repository's Git history or screenshots. The separate mihomo-daemon repository becomes public. Existing collection extensions and the running VPN installation are unchanged.
 

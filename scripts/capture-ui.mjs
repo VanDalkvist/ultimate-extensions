@@ -86,7 +86,7 @@ const capture = async (name, clip) => {
 await send('Page.enable')
 await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false })
-await send('Page.navigate', { url: `${base}/?conversation=20273` })
+await send('Page.navigate', { url: `${base}/` })
 await sleep(6000)
 
 /** Open a surface by its titlebar button, or a status-line chip by its text. */
@@ -102,7 +102,8 @@ const clickText = async (text) =>
   })()`)
 
 // Обрезаем левую панель: в публичном README не нужны приватные названия веток.
-const content = { x: 296, y: 0, width: 1144, height: 872 }
+// Stop above the status line: it can contain personal quota/cost data.
+const content = { x: 296, y: 0, width: 1144, height: 840 }
 
 for (const [name, label] of [
   ['files', 'Files'],
@@ -114,10 +115,7 @@ for (const [name, label] of [
   await capture(name, content)
 }
 
-// Расход подписки живёт в статусной строке: снимаем её фрагмент.
-await clickText('Agent')
-await sleep(1500)
-await capture('usage', { x: 30, y: 862, width: 470, height: 36 })
+// Quota/status-line captures are intentionally excluded from publication.
 
 ws.close()
 child.kill('SIGTERM')

@@ -6,6 +6,7 @@ export type Node = { name: string; type: string; delay: number | null }
 export type Provider = { id: string; name: string; nodes: Node[] }
 export type Snapshot = {
   issue: Issue | null
+  /** Controller mode/selection hint only; never an assertion of traffic protection. */
   enabled: boolean
   mode: Mode | null
   activeProxy: string | null

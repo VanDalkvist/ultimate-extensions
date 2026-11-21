@@ -19,6 +19,8 @@ test('production settings entry resolves live file targets and dispatches fixed 
   assert.ok(!JSON.stringify(info).includes('test-fixture-only'))
   const calls:unknown[]=[]
   await actions.openSettings({file:'connection'},{signal:new AbortController().signal,exec:async(command,args,options)=>{calls.push({command,args,options})}})
-  assert.deepEqual(calls,[{command:'/usr/bin/open',args:['-a','Zed',path],options:{timeout:5000}}])
+  const expected = process.platform === 'darwin' ? {command:'/usr/bin/open',args:['-t',path]}
+    : process.platform === 'win32' ? {command:'notepad.exe',args:[path]} : {command:'xdg-open',args:[path]}
+  assert.deepEqual(calls,[{...expected,options:{timeout:5000}}])
   assert.throws(()=>actions.settings({path:'/etc/passwd'}))
 })

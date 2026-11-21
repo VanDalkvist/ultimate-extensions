@@ -6,6 +6,7 @@ import { SegmentedControl, SegmentedControlItem } from '@/components/ui/segmente
 import { cn } from '@/sdk/solid'
 import type { VpnReader } from './readers.solid.tsx'
 import { SettingsAccess } from './settings.solid.tsx'
+import { modeLabel } from './presentation.ts'
 
 export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
   const [chosen, setChosen] = createSignal<string | null>(null)
@@ -17,13 +18,12 @@ export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
     providers()[0],
   )
   const blocked = () => !props.vpn.ready() || props.vpn.busy()
-  const statusLabel = () => props.vpn.status.data()?.enabled ? 'VPN включён' : 'Прямой трафик'
+  const statusLabel = () => modeLabel(props.vpn.ready() ? props.vpn.status.data()?.mode : null)
   return (
     <section aria-label="Управление VPN" class="flex max-h-[min(480px,75dvh)] flex-col gap-3 p-3 text-xs" data-vpn-panel>
       <header class="flex shrink-0 items-center justify-between gap-2">
         <div class="flex items-center gap-1.5 font-medium">
-          <Shield class="size-3.5" /><span>VPN</span>
-          <Show when={props.vpn.ready()}><span class="font-normal text-muted-foreground">{statusLabel()}</span></Show>
+          <Shield class="size-3.5" /><span>{statusLabel()}</span>
         </div>
         <div class="flex items-center gap-1">
           <Button aria-label="Обновить пинги VPN" class="h-7 w-7 p-0" disabled={blocked()} onClick={() => props.vpn.probe()} size={null} title="Измерить задержки" variant="ghost">
@@ -41,8 +41,8 @@ export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
       <Show when={props.vpn.ready()}>
         <div class="flex shrink-0 items-start gap-3">
           <p class="min-w-0 flex-1 leading-relaxed break-words">{active() ?? 'Сервер не выбран'}</p>
-          <Button aria-label={props.vpn.status.data()?.enabled ? 'Отключить VPN' : 'Включить VPN'} class="h-7 shrink-0 gap-1.5 px-2 text-xs" disabled={blocked()} onClick={() => props.vpn.power()} size={null} variant="ghost">
-            <Power class="size-3.5" />{props.vpn.status.data()?.enabled ? 'Отключить' : 'Включить'}
+          <Button aria-label={props.vpn.status.data()?.enabled ? 'Переключить Mihomo в Direct' : 'Переключить Mihomo в Rule'} class="h-7 shrink-0 gap-1.5 px-2 text-xs" disabled={blocked()} onClick={() => props.vpn.power()} size={null} variant="ghost">
+            <Power class="size-3.5" />{props.vpn.status.data()?.enabled ? 'В Direct' : 'В Rule'}
           </Button>
         </div>
         <Show when={providers().length} fallback={<p class="py-5 text-muted-foreground">В группе нет серверов. Настройки Mihomo остаются без изменений.</p>}>
@@ -65,6 +65,7 @@ export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
           </div>
         </Show>
       </Show>
+      <p aria-label="Ограничения режима Mihomo" class="shrink-0 text-[11px] leading-relaxed text-muted-foreground">Режим не подтверждает защиту IP/DNS. Это не kill switch; настройки общие для всех клиентов.</p>
       <SettingsAccess version={props.vpn.status.data()?.version} />
       <Show when={props.vpn.failure()}>{message => <p class="shrink-0 leading-relaxed text-warning" role="alert">{message()}</p>}</Show>
     </section>
