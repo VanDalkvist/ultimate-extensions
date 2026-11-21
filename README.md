@@ -9,6 +9,7 @@ that Ultimate discovers; no fork of the core, no patched upstream.
 | [Files](extensions/files)                       | Browse and edit the project's files, with a Markdown preview          |
 | [Terminal](extensions/terminal)                 | A bounded Linux terminal in the browser, started explicitly           |
 | [Subscription usage](extensions/subscription-usage) | Provider quota in the status line                                 |
+| [VPN](extensions/vpn) | Manual controls for an existing Mihomo daemon, Dashboard and settings |
 
 Written against Ultimate's extension API as of the `dfb253d` tree (November 2026): `solid-js` 2.0.3, `@ui-sdk/core` and
 `@ui-sdk/solid` 0.1.0-beta.13. They import Ultimate's own SDK (`@/sdk`, `@/components/ui`), so they run inside an
@@ -28,7 +29,7 @@ cp -r extensions/<name> <project>/.ultimate/extensions/
 ```
 
 [Terminal](extensions/terminal) needs `pnpm install` inside its folder afterwards (`node-pty` builds against the host's
-Node). The others have nothing to install.
+Node). [VPN](extensions/vpn) requires `git submodule update --init --recursive` and has its own safe installer/readiness check; initialize its dependency before copying it. VPN targets the newer native Solid 2 facet API (not the older React/island entry below). The remaining extensions have no dependency installation.
 
 ## A note on type-checking
 

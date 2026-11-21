@@ -1,0 +1,15 @@
+{
+  "name": "ultimate-vpn",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "test": "node --test --test-timeout=30000 test/*.test.ts",
+    "typecheck": "node scripts/typecheck.ts",
+    "install-extension": "node scripts/install.ts",
+    "preview": "node scripts/preview.ts"
+  }
+}
