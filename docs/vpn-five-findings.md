@@ -1,5 +1,8 @@
 # VPN five-finding remediation
 
+## Scope correction
+The operator clarified that Files, Terminal and Subscription usage screenshots belong to other extensions, not VPN. Treating docs/usage.png as a VPN finding and imposing a collection-wide screenshot ban was an author scope error. That finding is withdrawn. The existing quota image, shared capture script, shared ignore rules and screenshot documentation are restored to their pre-intervention content; VPN-only privacy instructions now live under extensions/vpn. No Git history or tags were rewritten. The earlier checklist/verification below records the pre-correction attempt, not authorization to modify sibling extensions.
+
 ## Design / scope
 Explicit operator request: fix the five publication findings. Use the existing native Solid UI and controller API. Preserve live Mihomo configuration/mode/selection and BB; do not create a kill switch, routing probe or automatic daemon lifecycle manager. No history rewrite: already-public historical screenshots cannot be recalled by deleting HEAD.
 

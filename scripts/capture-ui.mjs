@@ -2,22 +2,15 @@
 // usage: node capture-ui.mjs <base-url> <out-dir>
 
 import { spawn } from 'node:child_process'
-import { mkdir, realpath, writeFile } from 'node:fs/promises'
-import { resolve, sep } from 'node:path'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 
 const base = process.argv[2] ?? 'http://127.0.0.1:4747'
-const destination = process.argv[3] ?? process.env.BB_THREAD_STORAGE
-if (!destination) throw new Error('Choose an explicit private evidence directory; screenshots are never public assets')
-const out = resolve(destination)
+const out = process.argv[3] ?? '.'
 const chrome = process.env.CHROME ?? '/home/ubuntu/.local/bin/google-chrome'
 const port = 9333
 
 await mkdir(out, { recursive: true })
-const repository = await realpath(resolve(import.meta.dirname, '..'))
-const output = await realpath(out)
-if (output === repository || output.startsWith(repository + sep))
-  throw new Error('Refusing screenshot output inside the public checkout; use private thread storage')
 const child = spawn(
   chrome,
   [
@@ -93,7 +86,7 @@ const capture = async (name, clip) => {
 await send('Page.enable')
 await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false })
-await send('Page.navigate', { url: `${base}/` })
+await send('Page.navigate', { url: `${base}/?conversation=20273` })
 await sleep(6000)
 
 /** Open a surface by its titlebar button, or a status-line chip by its text. */
@@ -109,8 +102,7 @@ const clickText = async (text) =>
   })()`)
 
 // Обрезаем левую панель: в публичном README не нужны приватные названия веток.
-// Stop above the status line: it can contain personal quota/cost data.
-const content = { x: 296, y: 0, width: 1144, height: 840 }
+const content = { x: 296, y: 0, width: 1144, height: 872 }
 
 for (const [name, label] of [
   ['files', 'Files'],
@@ -122,7 +114,10 @@ for (const [name, label] of [
   await capture(name, content)
 }
 
-// Quota/status-line captures are intentionally excluded from publication.
+// Расход подписки живёт в статусной строке: снимаем её фрагмент.
+await clickText('Agent')
+await sleep(1500)
+await capture('usage', { x: 30, y: 862, width: 470, height: 36 })
 
 ws.close()
 child.kill('SIGTERM')

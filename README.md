@@ -33,12 +33,12 @@ If that destination already exists (including a dangling symlink), inspect it fi
 [Terminal](extensions/terminal) needs `pnpm install` inside its folder afterwards (`node-pty` builds against the host's
 Node). [VPN](extensions/vpn) requires `git submodule update --init --recursive` and has its own safe installer/readiness check; initialize its dependency before copying it. VPN targets the newer native Solid 2 facet API. The remaining extensions have no dependency installation.
 
-## Private visual verification
+## Screenshots
 
-`scripts/capture-ui.mjs` saves private verification images from a running Ultimate through the Chrome DevTools Protocol: it
-opens a page and captures only Files/Terminal, cropping the left sidebar and status line away so private branch,
-conversation and quota/cost data stay out. Quota screenshots are not generated or tracked. The CLI refuses output anywhere inside this public checkout (including symlinked destinations). Never commit verification screenshots. Run it against a checkout you can look at:
+`scripts/capture-ui.mjs` takes the images in `docs/` from a running Ultimate through the Chrome DevTools Protocol: it
+opens a page, clicks each surface in the top navigation, crops the left sidebar away (so private branch and
+conversation names stay out) and writes the PNGs. Run it against a checkout you can look at:
 
 ```sh
-node scripts/capture-ui.mjs http://127.0.0.1:4747 "${BB_THREAD_STORAGE:?Set a private evidence directory}/ui-checks"
+node scripts/capture-ui.mjs http://127.0.0.1:4747 docs
 ```
