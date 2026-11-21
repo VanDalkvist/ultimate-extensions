@@ -9,9 +9,11 @@ const requireFromHost = createRequire(
   resolve(process.env.ULTIMATE_CLONE ?? '../ultimate', 'package.json'),
 )
 const { JSDOM } = requireFromHost('jsdom')
+// shell.solid.tsx Panels: captured from the live Solid shell; Tabs owns the inner wrapper.
 const desktop = `<aside id="right" class="flex w-[22rem] shrink-0 flex-col border-l border-border/70 bg-sidebar">
-  <div class="flex h-10 shrink-0 items-center border-b"></div>
-  <div class="min-h-0 flex-1 overflow-y-auto"><iframe></iframe></div>
+  <div class="flex min-h-0 flex-1 flex-col">
+    <div class="min-h-0 flex-1 overflow-y-auto not-data-selected:hidden"><iframe></iframe></div>
+  </div>
 </aside>`
 const center = `<main><div data-ui="conversation"></div></main>`
 const left = `<aside id="left" class="flex shrink-0 flex-col border-r w-72 overflow-y-auto border-sidebar-border bg-sidebar text-sidebar-foreground"></aside>`
@@ -22,7 +24,7 @@ function shell(content: string) {
     .document as Document
 }
 
-test('binds only docked shell asides beside the Agent composer', () => {
+test('recognizes the live Solid shell with a Tabs wrapper, not sibling tab/content divs', () => {
   const document = shell(`<div>${left}${center}${desktop}</div><div>${dock}</div>`)
   const match = findPanels(document)
   assert.equal(match.left, document.getElementById('left'))
@@ -49,7 +51,9 @@ test('rejects a conversation dock, a narrow overlay, and ambiguous or changed ho
     `<div>${left}${center}<div role="dialog">${desktop}</div></div>`,
     `<div>${center}${desktop}${dock}</div>`,
     `<div>${center}${desktop}</div><div>${center}${dock}</div>`,
-    `<div>${center}${desktop.replace('overflow-y-auto', 'overflow-auto')}</div>`,
+    `<div>${center}${desktop.replace('border-l', 'border-r')}</div>`,
+    `<div>${center}<section>${desktop}</section></div>`,
+    `<div>${center}${desktop.replaceAll('aside', 'section')}</div>`,
     `<div><main></main>${desktop}</div>`,
   ])
     assert.equal(findPanels(shell(content)).right, undefined, content)

@@ -14,13 +14,7 @@ export function findPanels(document: Document) {
   return {
     mounted: centers.length > 0,
     left: !left?.previousElementSibling && left?.matches(leftAside) ? left : undefined,
-    right:
-      !right?.nextElementSibling &&
-      right?.matches(rightAside) &&
-      right.children[0]?.matches('div.h-10.shrink-0.border-b') &&
-      right.children[1]?.matches('div.flex-1.overflow-y-auto')
-        ? right
-        : undefined,
+    right: !right?.nextElementSibling && right?.matches(rightAside) ? right : undefined,
   }
 }
 
