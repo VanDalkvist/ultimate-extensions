@@ -27,27 +27,15 @@ cp -r extensions/<name> "$HOME/.ultimate/extensions/"
 cp -r extensions/<name> <project>/.ultimate/extensions/
 ```
 
-[Terminal](extensions/terminal) needs `pnpm install` inside its folder afterwards (`node-pty` builds against the host's
-Node). The others have nothing to install.
+If that destination already exists (including a dangling symlink), inspect it first; do not overwrite it. Ultimate discovers the personal extension and rebuilds the web bundle; no server restart is needed. To uninstall, disable it in Ultimate or remove only the symlink you created.
 
-## A note on type-checking
+## Screenshots
 
-`scripts/check-extension.ts` from the Ultimate clone may report type noise for these three — they were written against
-this clone's SDK and are compiled by Vite at runtime, which accepts them; each one is verified in a running UI (the
-screenshots above are from it). Fixing that noise is welcome but not required to run them.
+`scripts/capture-ui.mjs` takes the images in `docs/` from a running Ultimate through the Chrome DevTools Protocol: it
+opens a page, clicks each surface in the top navigation, crops the left sidebar away (so private branch and
+conversation names stay out) and writes the PNGs. Run it against a checkout you can look at:
 
-## On an older Ultimate
-
-Ultimate finds a web facet only through `web.tsx`, and its slot contributions are typed as React components. A Solid
-component reaches a slot through `island(...)`, as in
-[`extensions/keep-warm/web.tsx`](https://github.com/HazAT/ultimate/blob/main/extensions/keep-warm/web.tsx):
-
-```tsx
-// web.tsx
-import { defineWebExtension, island } from '@/sdk'
-import { Overlay } from './web.solid.tsx'
-
-export default defineWebExtension({ slots: { overlay: [island(Overlay)] } })
+```sh
+node scripts/capture-ui.mjs http://127.0.0.1:4747 docs
 ```
 
-[Desktop sidebar resize](extensions/right-panel-resize) uses exactly that shape.
