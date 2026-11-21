@@ -21,3 +21,7 @@ Run from the collection root with the Ultimate clone alongside it and its depend
 node "${ULTIMATE_CLONE:-../ultimate}/scripts/check-extension.ts" "$PWD/extensions/right-panel-resize"
 node --test --test-timeout=30000 extensions/right-panel-resize/test/*.test.ts
 ```
+
+For browser verification, `ultimate.detached` disables shared UI writes: use it for geometry, not proof that widths persist. Persistence needs your own writable isolated preview/profile, not removal of that protection in the user's live profile. The host's `web/src/sdk/ui-state.ts` (`tabWrites`) defines the write boundary.
+
+Record original preferences for both left and right panels, then change, flush pending UI writes, reload and read back the saved widths. Report preferred persisted widths separately from viewport-effective clamping and measured left/right geometry. Restore the original preferences in `finally`, flush and verify restoration. A detached reload mismatch is a test-setup error, not evidence that the user changed widths.
