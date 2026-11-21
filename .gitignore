@@ -3,3 +3,8 @@ node_modules/
 .DS_Store
 # Never publish personal subscription quota captures.
 /docs/usage.png
+# UI verification images belong in private thread storage, never public docs.
+/docs/*.png
+/docs/*.jpg
+/docs/*.jpeg
+/docs/*.webp

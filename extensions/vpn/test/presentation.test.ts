@@ -19,4 +19,6 @@ test('loopback dashboard is blocked for remote browsers, explicit HTTPS forwardi
   assert.equal(canOpenDashboard('http://127.0.0.1:9090/ui/', 'ultimate.localhost'), true)
   assert.equal(canOpenDashboard('https://dashboard.example.test/ui/', 'remote.example.test'), true)
   assert.equal(canOpenDashboard('javascript:alert(1)', 'localhost'), false)
+  assert.equal(canOpenDashboard('https://localhost./ui/', 'remote.example.test'), false)
+  assert.equal(canOpenDashboard('https://127.0.0.2/ui/', 'remote.example.test'), false)
 })

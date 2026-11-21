@@ -2,15 +2,22 @@
 // usage: node capture-ui.mjs <base-url> <out-dir>
 
 import { spawn } from 'node:child_process'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, realpath, writeFile } from 'node:fs/promises'
+import { resolve, sep } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
 const base = process.argv[2] ?? 'http://127.0.0.1:4747'
-const out = process.argv[3] ?? '.'
+const destination = process.argv[3] ?? process.env.BB_THREAD_STORAGE
+if (!destination) throw new Error('Choose an explicit private evidence directory; screenshots are never public assets')
+const out = resolve(destination)
 const chrome = process.env.CHROME ?? '/home/ubuntu/.local/bin/google-chrome'
 const port = 9333
 
 await mkdir(out, { recursive: true })
+const repository = await realpath(resolve(import.meta.dirname, '..'))
+const output = await realpath(out)
+if (output === repository || output.startsWith(repository + sep))
+  throw new Error('Refusing screenshot output inside the public checkout; use private thread storage')
 const child = spawn(
   chrome,
   [

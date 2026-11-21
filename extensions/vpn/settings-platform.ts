@@ -3,6 +3,7 @@ import { join, posix, win32 } from 'node:path'
 import { parseEnv } from 'node:util'
 import { MihomoError } from './dependencies/mihomo-daemon/index.ts'
 import type { SettingsPaths } from './settings.ts'
+import { isLoopbackHost } from './presentation.ts'
 
 export type OpenOptions = { platform?: NodeJS.Platform; editor?: string }
 export type SettingsConfig = OpenOptions & { paths: SettingsPaths; dashboardUrl?: string }
@@ -26,6 +27,13 @@ export async function loadSettingsConfig(
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
       throw new MihomoError('config', 'Не удалось прочитать параметры файлов VPN из .env')
     env = {}
+  }
+  // Non-secret UI metadata and executable names must never contain the controller credential.
+  if (env.MIHOMO_API_SECRET) for (const key of ['MIHOMO_CONFIG_PATH', 'MIHOMO_EDITOR', 'MIHOMO_DASHBOARD_URL']) {
+    let value = env[key] ?? ''
+    try { value = decodeURIComponent(value) } catch { /* Literal percent signs are valid in file names. */ }
+    if (value.includes(env.MIHOMO_API_SECRET))
+      throw new MihomoError('config', 'Параметры интерфейса VPN не должны содержать API-секрет')
   }
   const configured = env.MIHOMO_CONFIG_PATH
   if (configured) {
@@ -51,7 +59,7 @@ export async function loadSettingsConfig(
     let url: URL
     try { url = new URL(env.MIHOMO_DASHBOARD_URL) }
     catch { throw new MihomoError('config', 'Некорректный MIHOMO_DASHBOARD_URL') }
-    const local = ['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname) || url.hostname.endsWith('.localhost')
+    const local = isLoopbackHost(url.hostname)
     if (!(url.protocol === 'https:' || url.protocol === 'http:' && local) || url.username || url.password || url.search || url.hash)
       throw new MihomoError('config', 'Dashboard URL требует HTTPS или loopback HTTP, без пароля, query и hash')
     dashboardUrl = url.href

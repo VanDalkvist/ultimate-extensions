@@ -42,6 +42,14 @@ test('trusted settings file supplies absolute config path and safe Dashboard ove
     await writeFile(file, 'MIHOMO_DASHBOARD_URL=' + value)
     await assert.rejects(module.loadSettingsConfig(home, async () => true, 'linux'))
   }
+  for (const field of [
+    'MIHOMO_DASHBOARD_URL=https://dashboard.example.test/test-fixture%2Donly/',
+    'MIHOMO_CONFIG_PATH=/private/test-fixture-only/config.yaml',
+    'MIHOMO_EDITOR=test-fixture-only',
+  ]) {
+    await writeFile(file, 'MIHOMO_API_SECRET=test-fixture-only\n' + field)
+    await assert.rejects(module.loadSettingsConfig(home, async () => true, 'linux'))
+  }
   await writeFile(file, 'MIHOMO_CONFIG_PATH=relative/config.yaml')
   await assert.rejects(module.loadSettingsConfig(home, async () => true, 'linux'))
 })

@@ -6,7 +6,7 @@ Status-line VPN controls for an existing Mihomo controller: manual server/provid
 - Node 26+ and a compatible Ultimate **Solid 2** SDK; this snapshot uses the native web.solid.tsx entry. It is not the older React/island facet used by some other collection extensions.
 - An already running/configured Mihomo controller on loopback HTTP (default 127.0.0.1:9090) with a manual Selector (default PROXY).
 - MetaCubeXD assets already installed at /ui/metacubexd/ for the Dashboard link. The extension does not download them or configure Dashboard authentication.
-- File opening uses the host OS: macOS default text editor, Linux xdg-open, Windows Notepad. Zed is optional via MIHOMO_EDITOR. Unsupported/headless environments retain copy-path controls; launch failures are explicit. Platform command vectors are tested; native acceptance is on the current macOS host.
+- File opening uses the host OS: macOS default text editor, Linux xdg-open, Windows Notepad. Zed is optional via MIHOMO_EDITOR. Unsupported/headless environments retain copy-path controls; launch failures are explicit. Platform command vectors are tested; live UI/installer acceptance is on the current macOS host. Linux/Windows desktop launches are not claimed as live-verified.
 
 ## Install
 For a fresh checkout, use `git clone --recurse-submodules https://github.com/VanDalkvist/ultimate-extensions.git`, then enter the checkout. From the collection root:
