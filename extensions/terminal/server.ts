@@ -1,12 +1,12 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { deadline, every } from '../../../lib/timers.ts'
-import { isMissing, isNoProcess } from '../../../lib/errors.ts'
+import { setTimeout, clearTimeout, setInterval, clearInterval } from 'node:timers'
 import { bool, num, obj, oneOf, opt, str } from '@earendil-works/pi-schema'
-import { readdirSync, readFileSync } from 'node:fs'
 import { defineExtension, defineTool } from '@earendil-works/pi-durable'
 import type { JsonValue } from '@earendil-works/chord/json'
 import { spawn, type IPty } from 'node-pty'
+import { errnoCode } from './errors.ts'
 import { readLongpollMs } from './refs.ts'
+import { killSessionChildren } from './session-processes.ts'
 
 type Context = {
   host: { projectRoot: string }
@@ -60,44 +60,29 @@ function terminate(s: Session, leaderExited = false) {
   if (s.ended) return
   s.ended = true
   revoke(s)
-  // Bash job control gives foreground jobs their own process group. Kill this
-  // session's positive PIDs, not just bash's group. Deliberate daemons can escape.
   try {
-    const pids = readdirSync('/proc').filter((pid) => /^\d+$/.test(pid))
-    for (const pid of pids) {
-      try {
-        const fields = readFileSync(`/proc/${pid}/stat`, 'utf8').split(') ').at(-1)!.split(' ')
-        if (Number(fields[3]) === s.pty.pid && Number(pid) > 1 && Number(pid) !== s.pty.pid)
-          process.kill(Number(pid), 'SIGKILL')
-      } catch (error) {
-        if (!isMissing(error) && !isNoProcess(error))
-          console.error('Terminal process cleanup failed')
-      }
-    }
+    killSessionChildren(s.pty.pid, leaderExited)
+  } catch {
+    console.error('Terminal process cleanup failed')
   } finally {
     try {
       // #47345/review50791: node-pty onExit has already reaped the leader;
       // signalling its PID there risks killing a newly reused, unrelated PID.
       if (!leaderExited) s.pty.kill('SIGKILL')
     } catch (error) {
-      if (!isNoProcess(error)) console.error('Terminal PTY cleanup failed')
+      if (errnoCode(error) !== 'ESRCH') console.error('Terminal PTY cleanup failed')
     }
     s.wake?.()
   }
 }
 
 export default function (host: { projectRoot: string; onClose(fn: () => Promise<void>): void }) {
-  const stopExpiry = every(
-    1000,
-    () => {
-      if (session?.grant && Date.now() >= session.grant.expires) revoke(session)
-      if (session && (Date.now() > session.lease || Date.now() > session.deadline))
-        terminate(session)
-    },
-    { unref: true },
-  )
+  const expiry = setInterval(() => {
+    if (session?.grant && Date.now() >= session.grant.expires) revoke(session)
+    if (session && (Date.now() > session.lease || Date.now() > session.deadline)) terminate(session)
+  }, 1000).unref()
   host.onClose(async () => {
-    stopExpiry()
+    clearInterval(expiry)
     if (session) terminate(session)
     session = undefined
     pending = undefined
@@ -351,12 +336,12 @@ export const actions = {
       if (cursor === s.base + s.buffer.length && !s.ended && !ctx.signal.aborted) {
         await new Promise<void>((resolve) => {
           const wake = () => {
-            cancelDeadline()
+            clearTimeout(timer)
             ctx.signal.removeEventListener('abort', wake)
             s.wake = undefined
             resolve()
           }
-          const cancelDeadline = deadline(readLongpollMs, wake)
+          const timer = setTimeout(wake, readLongpollMs)
           s.wake = wake
           ctx.signal.addEventListener('abort', wake, { once: true })
           if (ctx.signal.aborted) wake()

@@ -29,6 +29,9 @@ browsing the machine.
 ```sh
 mkdir -p "$HOME/.ultimate/extensions"
 cp -r extensions/files "$HOME/.ultimate/extensions/"
+cd "$HOME/.ultimate/extensions/files"
+pnpm install --frozen-lockfile
 ```
 
-Ultimate's own `@tiptap/*` packages are already in its checkout; nothing else to install.
+If you link the extension instead of copying it, run the same install command in the linked Files folder. Files owns
+its editor and preview dependencies; nothing needs to be installed in Ultimate's checkout.

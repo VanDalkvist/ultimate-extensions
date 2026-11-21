@@ -1,16 +1,12 @@
-import type { MouseEvent, ReactElement } from 'react'
-import { createElement } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { FileLink, fileRequests } from '../../links.tsx'
+import { fileLinkPath, fileRequests, requestFile } from '../../links.ts'
 import { createSession } from '../../session.tsx'
 import type { FileResult } from '../../types.ts'
 
 const fake = vi.hoisted(() => ({
-  showSurface: vi.fn<(id: string) => void>(),
   action: vi.fn<(ref: { name: string }, args: unknown) => Promise<FileResult>>(),
 }))
 vi.mock('@/sdk', () => ({
-  useUltimate: () => ({ showSurface: fake.showSurface }),
   actionRef: (extension: string, name: string) => ({ extension, name }),
   api: { action: fake.action },
   errorMessage: (error: unknown) => String(error),
@@ -42,15 +38,9 @@ it('requests Files before it mounts, then opens the requested tab without replac
   files.edit(original.id, '# Local draft')
   files.open('other.md')
 
-  const link = FileLink({
-    href: '#files/docs/plan%20v2.md',
-    children: 'Plan',
-    core: 'external link',
-  }) as ReactElement<{ onClick(event: MouseEvent): void }>
-  const preventDefault = vi.fn<() => void>()
-  link.props.onClick({ preventDefault } as unknown as MouseEvent)
-  expect(preventDefault).toHaveBeenCalledOnce()
-  expect(fake.showSurface).toHaveBeenCalledWith('files')
+  const linkedPath = fileLinkPath('#files/docs/plan%20v2.md')
+  expect(linkedPath).toBe(path)
+  requestFile(linkedPath!)
   const request = fileRequests.get()!
   expect(request).toEqual({ path })
 
@@ -66,9 +56,11 @@ it('requests Files before it mounts, then opens the requested tab without replac
 
 it('leaves external and core conversation links untouched', () => {
   for (const href of ['https://example.com/file.md', '#conversation-123', '?conversation=123']) {
-    const core = createElement('a', { href }, 'Original link')
-    expect(FileLink({ href, children: 'Link', core })).toBe(core)
+    expect(fileLinkPath(href)).toBeUndefined()
   }
-  expect(fake.showSurface).not.toHaveBeenCalled()
   expect(fileRequests.get()).toBeNull()
+})
+
+it('distinguishes malformed Files links from untouched links', () => {
+  expect(fileLinkPath('#files/docs/%')).toBeNull()
 })

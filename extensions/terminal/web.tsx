@@ -1,4 +1,4 @@
-import { settled } from '../../../lib/errors.ts'
+import { settled } from './errors.ts'
 import type { ConversationId } from '@earendil-works/pi-durable'
 import terminalCss from '@wterm/dom/css?inline'
 import { GhosttyCore } from '@wterm/ghostty'
@@ -24,7 +24,7 @@ import {
   useUltimate,
 } from '@/sdk'
 import type { ToolCallView } from '@/sdk'
-import { AnsiOutput } from '@/components/ai/ansi-output'
+import { AnsiOutput } from '@/compat/ai/ansi-output'
 import { Tool, ToolHeader, ToolContent } from '@/components/ai/tool'
 import { terminalViewLifecycle } from './lifecycle.tsx'
 import { readWithRetry } from './read-retry.tsx'
@@ -397,15 +397,15 @@ function TerminalSurface() {
               webmcp={false}
               debug={false}
               ref={term}
-              onReady={(value) => {
+              onReady={(value: WTerm) => {
                 if (term.current?.instance !== value) return
                 setReady(true)
                 launch.ready(value)
               }}
-              onResize={(cols, rows) => {
+              onResize={(cols: number, rows: number) => {
                 if (running.current) void settled(control({ cols, rows }))
               }}
-              onData={(secretInput) => input(new TextEncoder().encode(secretInput))}
+              onData={(secretInput: string) => input(new TextEncoder().encode(secretInput))}
               onBinary={input}
               onError={() => {
                 launch.invalidate()

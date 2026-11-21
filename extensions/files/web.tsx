@@ -21,7 +21,8 @@ import { Directory } from './tree.tsx'
 import { MarkdownEditor } from './markdown-editor.tsx'
 import { MarkdownPreview } from './markdown-preview.tsx'
 import { previewReason } from './markdown-document.tsx'
-import { FileLink, fileRequests } from './links.tsx'
+import { FileLink } from './link.solid.tsx'
+import { fileRequests } from './links.ts'
 
 function FilesSurface() {
   const [refresh, setRefresh] = useState(0)

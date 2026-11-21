@@ -1,4 +1,4 @@
-import { retriedLater } from '../../../lib/errors.ts'
+import { retriedLater } from './errors.ts'
 
 type ViewSession = {
   owner: 'user' | 'agent'

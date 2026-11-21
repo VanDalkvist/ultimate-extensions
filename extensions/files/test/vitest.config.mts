@@ -1,15 +1,17 @@
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vitest/config'
 
-// Reuse the installed runtime's runner, SDK and test isolation; no separate package install.
-export default defineConfig({
-  root: fileURLToPath(new URL('..', import.meta.url)),
-  resolve: { alias: { '@': '/home/ubuntu/Projects/ultimate/web/src' } },
-  test: {
-    include: ['test/**/*.test.ts'],
-    setupFiles: [
-      '/home/ubuntu/Projects/ultimate/test/setup.ts',
-      '/home/ubuntu/Projects/ultimate/test/no-group-signals.ts',
-    ],
+// Run from the Ultimate checkout with its Vitest and test isolation.
+const host = process.cwd()
+
+export default {
+  resolve: {
+    alias: { '@/sdk': join(host, 'web/src/compat/sdk.ts'), '@ultimate': host },
+    dedupe: ['vitest', '@earendil-works/pi-durable'],
   },
-})
+  oxc: { jsx: { runtime: 'automatic' } },
+  test: {
+    dir: fileURLToPath(new URL('.', import.meta.url)),
+    setupFiles: [join(host, 'test/setup.ts'), join(host, 'test/no-group-signals.ts')],
+  },
+}
