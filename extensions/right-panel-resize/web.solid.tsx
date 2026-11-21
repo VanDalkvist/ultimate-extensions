@@ -5,6 +5,7 @@ import {
   useConversationId,
   useExtensionUiState,
   usePanels,
+  useRegionOpen,
   useSurface,
   useViewport,
   writingAs,
@@ -12,11 +13,11 @@ import {
 import { definePrimitive } from '@ui-sdk/core'
 import { createParts } from '@ui-sdk/solid/primitive'
 import { Show, createEffect, createSignal, onSettled } from 'solid-js'
-import { findPanel } from './panel.ts'
-import { connectResize } from './resize.ts'
+import { findPanels, type Side } from './panel.ts'
+import { connectResize, preferredWidth, type Choice } from './resize.ts'
 
-type Choice = number | null
-type Target = { main: HTMLElement; panel: HTMLElement }
+type Target = { panel: HTMLElement; defaultWidth: number }
+const sides = ['left', 'right'] as const
 
 const separator = definePrimitive({
   name: 'right-panel-resize',
@@ -40,26 +41,31 @@ const separator = definePrimitive({
 const { Root: Separator } = createParts(separator, { root: 'div' })
 
 function Handle(props: {
+  side: Side
   target: Target
   context: () => string
   width: () => Choice
+  peer: () => number | undefined
   save: (width: Choice) => void
 }) {
   let handle!: HTMLDivElement
   let resize: ReturnType<typeof connectResize> | undefined
+  const label = () => (props.side === 'left' ? 'Resize left sidebar' : 'Resize right panel')
   createEffect(
-    () => ({ width: props.width(), context: props.context() }),
-    ({ width, context }) => {
-      resize ??= connectResize(handle, props.target.main, props.target.panel, props.save)
-      resize.update(width, context)
+    () => ({ width: props.width(), peer: props.peer(), context: props.context() }),
+    ({ width, peer, context }) => {
+      const { panel, defaultWidth } = props.target
+      resize ??= connectResize(handle, panel, props.side, defaultWidth, props.save)
+      resize.update(width, peer, context)
     },
   )
   onSettled(() => () => resize?.dispose())
   return (
     <Separator
-      aria-label="Resize right panel"
-      title="Resize right panel · Double-click to reset"
-      data-right-panel-resize=""
+      aria-label={label()}
+      title={`${label()} · Double-click to reset`}
+      data-right-panel-resize={props.side === 'right' ? '' : undefined}
+      data-left-panel-resize={props.side === 'left' ? '' : undefined}
       class="fixed z-20 w-2 -translate-x-1/2 cursor-col-resize touch-none select-none hover:bg-accent/60 focus-visible:bg-accent focus-visible:outline focus-visible:outline-ring data-dragging:bg-accent/60"
       style={{ visibility: 'hidden' }}
       ref={(element) => {
@@ -71,52 +77,68 @@ function Handle(props: {
 }
 
 function Overlay() {
-  const [stored, setStored] = useExtensionUiState<Choice>('width', null)
+  const bindings = {
+    left: useExtensionUiState<Choice>('leftWidth', null),
+    right: useExtensionUiState<Choice>('width', null),
+  }
   const { active, open } = usePanels()
+  const sidebarOpen = useRegionOpen('sidebar')
   const surface = useSurface()
   const viewport = useViewport()
   const conversation = useConversationId()
-  const [target, setTarget] = createSignal<Target>()
+  const context = () => `${conversation()}:${active()?.id}`
+  const [targets, setTargets] = createSignal<Partial<Record<Side, Target>>>({})
+  const warned = new Set<Side>()
+  let current: Partial<Record<Side, Target>> = {}
   createEffect(
-    () =>
-      surface() === 'agent' &&
-      viewport() === 'desktop' &&
-      open() &&
-      !!active() &&
-      conversation() !== undefined,
+    () => {
+      if (surface() !== 'agent' || viewport() !== 'desktop' || conversation() === undefined)
+        return 0
+      return Number(sidebarOpen()) + (open() && active() ? 2 : 0)
+    },
     (enabled) => {
       if (!enabled) {
-        setTarget(undefined)
+        current = {}
+        warned.clear()
+        setTargets(current)
         return
       }
-      let current: Target | undefined
-      let warned = false
       function sync() {
-        const { main, panel } = findPanel(document)
-        if (main === current?.main && panel === current?.panel && current) return
-        current = main && panel ? { main, panel } : undefined
-        setTarget(current)
-        if (current) warned = false
-        else if (!warned) {
-          warned = true
-          notify({
-            level: 'warning',
-            message:
-              'Right panel resize: the desktop panel was not recognized. No panel was changed.',
-          })
+        const found = findPanels(document)
+        const next: Partial<Record<Side, Target>> = {}
+        for (const [index, side] of sides.entries()) {
+          const expected = (enabled & (1 << index)) !== 0
+          const panel = expected ? found[side] : undefined
+          const previous = current[side]
+          if (panel)
+            next[side] =
+              previous?.panel === panel
+                ? previous
+                : { panel, defaultWidth: panel.getBoundingClientRect().width }
+          if (panel || !expected || !found.mounted) warned.delete(side)
+          else if (!warned.has(side)) {
+            warned.add(side)
+            const region = side === 'left' ? 'left sidebar' : 'right panel'
+            notify({
+              level: 'warning',
+              message: `Resize: the desktop ${region} was not recognized. It was left unchanged.`,
+            })
+          }
+        }
+        if (next.left !== current.left || next.right !== current.right) {
+          current = next
+          setTargets(next)
         }
       }
       const observer = new MutationObserver((records) => {
+        const panel = current.left?.panel ?? current.right?.panel
+        const shell = panel?.parentElement
         if (
-          !current ||
-          records.some(({ target }) => {
-            const { main, panel } = current!
-            return (
-              target === main ||
-              target === panel ||
-              (!main.contains(target) && !panel.contains(target))
-            )
-          })
+          !shell ||
+          records.some(
+            ({ target }) =>
+              target.parentNode === shell || target === shell || !shell.contains(target),
+          )
         )
           sync()
       })
@@ -128,17 +150,33 @@ function Overlay() {
       return () => observer.disconnect()
     },
   )
+  function handle(side: Side) {
+    const other = side === 'left' ? 'right' : 'left'
+    const [width, save] = bindings[side]
+    const peer = () => {
+      const target = targets()[other]
+      return target ? preferredWidth(bindings[other][0](), target.defaultWidth) : undefined
+    }
+    return (
+      <Show when={targets()[side]} keyed>
+        {(target) => (
+          <Handle
+            side={side}
+            target={target}
+            context={context}
+            width={width}
+            peer={peer}
+            save={save}
+          />
+        )}
+      </Show>
+    )
+  }
   return (
-    <Show when={target()} keyed>
-      {(panel) => (
-        <Handle
-          target={panel}
-          context={() => `${conversation()}:${active()?.id}`}
-          width={stored}
-          save={setStored}
-        />
-      )}
-    </Show>
+    <>
+      {handle('left')}
+      {handle('right')}
+    </>
   )
 }
 

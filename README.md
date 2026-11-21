@@ -2,7 +2,7 @@
 
 Personal extensions for [Ultimate](https://github.com/HazAT/ultimate).
 
-- [Right panel resize](extensions/right-panel-resize): drag the left edge of the desktop Agent panel to resize it. The extension uses the public Solid SDK, with a narrow adapter for the current shell DOM because the SDK does not expose panel width.
+- [Desktop sidebar resize](extensions/right-panel-resize): drag the inside edge of either desktop Agent sidebar. The extension uses the public Solid SDK, with a narrow adapter for the current shell DOM because the SDK does not expose panel widths.
 
 ## Install
 

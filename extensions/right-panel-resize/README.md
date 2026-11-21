@@ -1,12 +1,17 @@
-Resize Ultimate’s desktop Agent right panel from its left edge; supports the current shell DOM, not the conversation dock or mobile overlay.
+Resize Ultimate’s desktop Agent left sidebar and right panel; supports the current shell DOM, not the project rail, conversation dock, or narrow overlays.
 
-Drag the left edge to resize all panel tabs. Focus the separator and use **←** to widen and **→** to narrow (16 px; hold **Shift** for 64 px). **Home** and **End** choose the limits. **Enter** or a double-click resets to the host width. **Escape** cancels an in-progress drag.
+Drag either inside edge: the right edge of the left sidebar or the left edge of the right panel. Focus a separator and use **←** and **→** to move that edge (16 px; hold **Shift** for 64 px). **Home** and **End** choose the minimum and maximum. **Enter** or a double-click resets that side to the host width.
 
-The width is saved in extension UI state on a completed drag, keyboard change, reset, or agent action. At rest and during drag, the panel reserves 360 px for the central conversation independently of the left sidebar and project rail; the desired width returns when enough room is available. The normal minimum is 280 px, reduced only if that would take space from the conversation. A temporary transparent shield keeps an embedded iframe from intercepting an active drag. Cancellation (including navigation, closing the panel, or window blur) keeps the previously saved width.
+Each side remembers its own width after a completed drag, keyboard change, reset, or agent action. Both panels share the space left after reserving 360 px for the conversation, separate from the project rail. The normal minima are 200 px on the left and 280 px on the right. If both saved widths cannot fit, the left takes priority above those minima; saved preferences return when there is room. An active resize respects the other panel's current allocation. A temporary transparent shield keeps an embedded iframe from intercepting a drag. A pointer cancellation, lost capture, navigation, panel close, or window blur keeps the previously saved width. Escape is reserved for Ultimate’s own shortcut.
 
 ## Host contract
 
-The public Solid SDK provides the `overlay` slot, Agent surface and conversation selection, panel state, viewport, notifications, and durable UI state. It does not provide a panel width setter. `panel.ts` recognizes just the current desktop `Panels` aside in the Agent surface: the terminal sibling immediately after the unique shell `main` containing a direct `[data-ui="conversation"]`, with the host's `w-[22rem]`, `border-l`, and `bg-sidebar` utilities and the PanelTabs/scroll-content structure. If the host no longer matches, the extension leaves it unchanged and shows a warning. The root slot owns the separate fixed-position handle; the only modified property on the host panel is its inline `width`, restored on detach. The extension does not replace the panel or reload its content.
+The public Solid SDK provides the `overlay` slot, surface and conversation selection, panel state, viewport, notifications, and durable UI state. It does not provide a width setter. `panel.ts` only matches the Agent shell’s unique `main` containing a direct `[data-ui="conversation"]`:
+
+- Left: the first direct sibling immediately before `main`, an `aside` with `w-72`, `border-r`, `overflow-y-auto`, and the shell's sidebar color utilities.
+- Right: the last direct sibling immediately after `main`, an `aside` with `w-[22rem]`, `border-l`, and `bg-sidebar`, with the host’s PanelTabs and scroll-content structure.
+
+The extension runs on desktop only. Once the composer mounts, an expected region that does not match is left unchanged and gets a warning. The root slot owns both fixed-position handles; the only modified property on an aside is its inline `width`, restored on detach. Neither the panels nor their contents are replaced or reloaded by the extension.
 
 ## Development
 

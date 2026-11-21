@@ -1,27 +1,49 @@
-const composer = '#app > .safe-area > div > div > main:has(> [data-ui="conversation"])'
-const desktopAside = 'aside.flex.shrink-0.flex-col.border-l.bg-sidebar[class~="w-[22rem]"]'
+export type Side = 'left' | 'right'
+type Bounds = { min: number; max: number }
 
-export function findPanel(document: Document) {
+const composer = '#app > .safe-area > div > div > main:has(> [data-ui="conversation"])'
+const leftAside =
+  'aside.flex.shrink-0.flex-col.border-r.w-72.overflow-y-auto.border-sidebar-border.bg-sidebar.text-sidebar-foreground'
+const rightAside = 'aside.flex.shrink-0.flex-col.border-l.bg-sidebar[class~="w-[22rem]"]'
+
+export function findPanels(document: Document) {
   const centers = document.querySelectorAll<HTMLElement>(composer)
   const main = centers.length === 1 ? centers[0] : undefined
-  const panel = main?.nextElementSibling as HTMLElement | undefined
-  if (
-    !main ||
-    !panel?.matches(desktopAside) ||
-    panel.nextElementSibling ||
-    !panel.children[0]?.matches('div.h-10.shrink-0.border-b') ||
-    !panel.children[1]?.matches('div.flex-1.overflow-y-auto')
-  )
-    return { main, panel: undefined }
-  return { main, panel }
+  const left = main?.previousElementSibling as HTMLElement | undefined
+  const right = main?.nextElementSibling as HTMLElement | undefined
+  return {
+    mounted: centers.length > 0,
+    left: !left?.previousElementSibling && left?.matches(leftAside) ? left : undefined,
+    right:
+      !right?.nextElementSibling &&
+      right?.matches(rightAside) &&
+      right.children[0]?.matches('div.h-10.shrink-0.border-b') &&
+      right.children[1]?.matches('div.flex-1.overflow-y-auto')
+        ? right
+        : undefined,
+  }
 }
 
-export function panelBounds(span: number) {
-  const max = Math.max(0, Math.floor(span - 360))
-  return { min: Math.min(280, max), max }
+export function panelBounds(
+  span: number,
+  side: Side,
+  width: number,
+  peer: number | undefined,
+): Bounds {
+  const room = Math.max(0, Math.floor(span - 360))
+  const left = side === 'left' ? width : peer
+  const right = side === 'right' ? width : peer
+  const leftMin = left === undefined ? 0 : Math.min(200, room)
+  const rightMin = right === undefined ? 0 : Math.min(280, room - leftMin)
+  const leftFit = left === undefined ? 0 : clampWidth(left, { min: leftMin, max: room - rightMin })
+  const rightFit =
+    right === undefined ? 0 : clampWidth(right, { min: rightMin, max: room - leftFit })
+  return side === 'left'
+    ? { min: leftMin, max: room - rightFit }
+    : { min: rightMin, max: room - leftFit }
 }
 
-export function clampWidth(width: number, { min, max }: ReturnType<typeof panelBounds>) {
+export function clampWidth(width: number, { min, max }: Bounds) {
   return Math.min(max, Math.max(min, Math.round(width)))
 }
 
@@ -29,13 +51,15 @@ export function keyboardWidth(
   key: string,
   width: number,
   step: number,
-  bounds: ReturnType<typeof panelBounds>,
+  bounds: Bounds,
+  side: Side,
 ) {
+  const direction = side === 'left' ? 1 : -1
   switch (key) {
     case 'ArrowLeft':
-      return clampWidth(width + step, bounds)
+      return clampWidth(width - step * direction, bounds)
     case 'ArrowRight':
-      return clampWidth(width - step, bounds)
+      return clampWidth(width + step * direction, bounds)
     case 'Home':
       return bounds.min
     case 'End':
