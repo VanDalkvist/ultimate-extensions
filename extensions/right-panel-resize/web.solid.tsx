@@ -1,6 +1,5 @@
 /** @jsxImportSource @solidjs/web */
 import {
-  defineWebExtension,
   notify,
   useConversationId,
   useExtensionUiState,
@@ -180,4 +179,4 @@ function Overlay() {
   )
 }
 
-export default defineWebExtension({ slots: { overlay: Overlay } })
+export { Overlay }
