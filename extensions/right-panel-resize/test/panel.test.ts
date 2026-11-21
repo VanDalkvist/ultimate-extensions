@@ -117,7 +117,7 @@ test('reset removes extension-owned width and cleanup respects a later foreign i
   assert.equal(panel.style.width, '480px')
 })
 
-function gestureFixture() {
+function gestureFixture(pointerType = 'mouse') {
   const document = shell(`<div>${center}${desktop}</div>`)
   const window = document.defaultView!
   Object.defineProperty(window, 'ResizeObserver', {
@@ -149,7 +149,7 @@ function gestureFixture() {
         button,
         buttons,
         pointerId: 1,
-        pointerType: 'mouse',
+        pointerType,
         isPrimary: true,
       }),
     )
@@ -172,6 +172,33 @@ test('releasing primary while secondary remains held commits immediately and ign
   assert.deepEqual(saved, [412])
   pointer('pointermove', 488, -1, 2)
   pointer('pointerup', 488, 2, 0)
+  assert.equal(panel.style.width, '412px')
+  assert.deepEqual(saved, [412])
+})
+
+test('a bound-locked panel keeps its reset accessible', (t) => {
+  const { window, panel, handle, saved, resize } = gestureFixture()
+  t.after(resize.dispose)
+  panel.parentElement!.getBoundingClientRect = () => new window.DOMRect(0, 0, 1008, 800)
+  resize.update(600, 500, 'agent')
+  assert.equal(panel.style.width, '280px')
+  assert.equal(handle.getAttribute('aria-valuemin'), '280')
+  assert.equal(handle.getAttribute('aria-valuemax'), '280')
+  assert.equal(handle.style.visibility, 'visible')
+  handle.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter' }))
+  assert.deepEqual(saved, [null])
+})
+
+test('pen contact ending with the barrel button held commits at tip-up, not barrel-up', (t) => {
+  const { panel, pointer, shield, saved, resize } = gestureFixture('pen')
+  t.after(resize.dispose)
+  pointer('pointerdown', 648, 0, 1)
+  pointer('pointermove', 578, 2, 3)
+  pointer('pointermove', 588, 0, 2)
+  assert.equal(shield(), null)
+  assert.deepEqual(saved, [412])
+  pointer('pointermove', 558, -1, 2)
+  pointer('pointerup', 548, 2, 0)
   assert.equal(panel.style.width, '412px')
   assert.deepEqual(saved, [412])
 })

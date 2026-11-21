@@ -40,7 +40,7 @@ export function connectResize(
     handle.style.left = `${outerEdge + direction * visibleWidth}px`
     handle.style.top = `${rect.top}px`
     handle.style.height = `${rect.height}px`
-    handle.style.visibility = rect.height > 0 && bounds.max > bounds.min ? 'visible' : 'hidden'
+    handle.style.visibility = rect.height > 0 ? 'visible' : 'hidden'
     handle.setAttribute('aria-valuemin', String(bounds.min))
     handle.setAttribute('aria-valuemax', String(bounds.max))
     handle.setAttribute('aria-valuenow', String(visibleWidth))
@@ -94,7 +94,7 @@ export function connectResize(
     }
     function finish(next: PointerEvent) {
       if (next.pointerId !== gesture.id) return
-      if (next.pointerType !== 'mouse' || next.button === 0) move(next)
+      if (next.pointerType === 'touch' || next.button === 0) move(next)
       const width = visibleWidth
       if (width === gesture.from) gesture.end()
       else choose(width)
@@ -103,7 +103,7 @@ export function connectResize(
       'pointermove',
       (next) => {
         if (next.pointerId !== gesture.id) return
-        if (next.pointerType === 'mouse' && (next.buttons & 1) === 0) finish(next)
+        if (next.pointerType !== 'touch' && (next.buttons & 1) === 0) finish(next)
         else move(next)
       },
       options,
