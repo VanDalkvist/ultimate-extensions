@@ -36,4 +36,4 @@ npm --prefix extensions/vpn run typecheck
 npm --prefix extensions/vpn run preview
 ```
 The preview uses scripted loopback data and a disposable home, not the real VPN. Stop only its owned process with SIGTERM. Tests use synthetic credentials/names. No personal screenshots, config files or standalone Git history are included.
-The daemon source is a separate repository, not the upstream Mihomo binary or a service installer. Repository visibility does not grant an additional reuse license; no license is added implicitly by this publication.
+The daemon source is a separate repository, not the upstream Mihomo binary or a service installer. The VPN snapshot in this collection follows the root MIT license. The separately versioned daemon currently has no LICENSE; do not assume the collection's license covers that separate repository.
