@@ -1,0 +1,10 @@
+/* #47345: project-only responsive utilities are not emitted by the host scanner. */
+@media (width < 40rem) {
+  .terminal-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .terminal-summary {
+    flex-basis: 100%;
+  }
+}
