@@ -23,25 +23,23 @@ menu, the palette, tool cards and a restored view only navigate. **Start shell**
 
 ## Install
 
+Use the Ultimate host's Node version and architecture. On macOS, install the Xcode command-line tools and Python 3
+first. On Linux, see [node-pty's build prerequisites](https://github.com/microsoft/node-pty/tree/v1.1.0#dependencies).
+Then copy and install from the lockfile:
+
 ```sh
 mkdir -p "$HOME/.ultimate/extensions"
 cp -r extensions/terminal "$HOME/.ultimate/extensions/"
-cd "$HOME/.ultimate/extensions/terminal" && npm install
+cd "$HOME/.ultimate/extensions/terminal" && npm ci
 ```
 
-Dependencies are pinned: `@wterm/dom`, `@wterm/react`, `@wterm/ghostty` 0.5.10 and `node-pty` 1.1.0. The two Pi
-packages match the current Ultimate host and are installed locally so that a copied extension can load its server facet.
-Use the same Node version and architecture as the host. `node-pty` uses its prebuilt addon where available or builds
-with [node-gyp](https://github.com/nodejs/node-gyp#installation). The WASM asset is the custom ABI bundled with
-`@wterm/ghostty`, not an official Ghostty binary.
-
-To verify a source build on macOS with the host's Node (tested with Node 26 arm64), install the Xcode command-line
-compiler tools and Python 3, then run from the installed Terminal directory:
+**macOS requires a source build after every `npm ci`.** The `node-pty` 1.1.0 prebuilt macOS arm64 package ships a
+non-executable `spawn-helper`; installing it successfully does not mean a shell can start. Run this from the installed
+Terminal directory before opening a shell (verified on Node 26 arm64):
 
 ```sh
-cd node_modules/node-pty
-npm exec -- node-gyp rebuild
+(cd node_modules/node-pty && npm exec --yes --package=node-gyp@13.1.0 -- node-gyp rebuild)
 ```
 
-The normal `npm install` is sufficient if the prebuilt addon is usable. For Linux build prerequisites, see
-[node-pty's platform instructions](https://github.com/microsoft/node-pty/tree/v1.1.0#dependencies).
+Linux uses the normal `npm ci` path; the extra rebuild step is not needed. The two pinned Pi packages match the
+current Ultimate host. The WASM asset is the custom ABI bundled with `@wterm/ghostty`, not an official Ghostty binary.

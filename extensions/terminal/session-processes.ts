@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { errnoCode } from './errors.ts'
 
 export function killSessionChildren(leader: number, leaderExited: boolean, platform = process.platform) {
-  if (!Number.isSafeInteger(leader) || leader <= 1) return
+  if (!Number.isSafeInteger(leader) || leader <= 1) return false
   const kill = (pid: number) => {
     try {
       process.kill(pid, 'SIGKILL')
@@ -28,17 +28,30 @@ export function killSessionChildren(leader: number, leaderExited: boolean, platf
   } else if (platform === 'darwin' && !leaderExited) {
     // Darwin ps exposes the controlling terminal device, not a numeric session ID.
     // Anchor it to our live leader in the same snapshot; a dead leader's tty can be reused.
-    const rows = execFileSync('/bin/ps', ['-ax', '-o', 'pid=,ppid=,pgid=,tdev='], {
+    const rows = execFileSync('/bin/ps', ['-ax', '-o', 'pid=,ppid=,pgid=,stat=,tdev='], {
       encoding: 'utf8',
       timeout: 1000,
-    }).split('\n').map((row) => row.trim().split(/\s+/))
-    const tty = rows.find(([pid, parent, group]) =>
-      Number(pid) === leader && Number(parent) === process.pid && Number(group) === leader,
-    )?.[3]
-    if (!tty || !/^\d+\/\d+$/.test(tty)) return
-    for (const [pid, , , device] of rows) {
-      if (device === tty && /^\d+$/.test(pid) && Number(pid) > 1 && Number(pid) !== leader)
-        kill(Number(pid))
+    })
+      .split('\n')
+      .map((row) => row.trim().split(/\s+/))
+    const ownedLeader = rows.find(
+      ([pid, parent, group, state]) =>
+        Number(pid) === leader &&
+        Number(parent) === process.pid &&
+        Number(group) === leader &&
+        !!state &&
+        !state.startsWith('Z'),
+    )
+    if (!ownedLeader) return false
+    // Before the spawn-helper attaches the tty, only the leader can be identified.
+    const tty = ownedLeader[4]
+    if (tty && /^\d+\/\d+$/.test(tty)) {
+      for (const [pid, , , , device] of rows) {
+        if (device === tty && /^\d+$/.test(pid) && Number(pid) > 1 && Number(pid) !== leader)
+          kill(Number(pid))
+      }
     }
+    return true
   }
+  return false
 }

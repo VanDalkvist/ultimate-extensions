@@ -24,8 +24,7 @@ import {
   useUltimate,
 } from '@/sdk'
 import type { ToolCallView } from '@/sdk'
-import { AnsiOutput } from '@/compat/ai/ansi-output'
-import { Tool, ToolHeader, ToolContent } from '@/components/ai/tool'
+import { Tool, ToolHeader, ToolContent, ToolOutput } from '@/components/ai/tool'
 import { terminalViewLifecycle } from './lifecycle.tsx'
 import { readWithRetry } from './read-retry.tsx'
 import { shellLaunch, shellOpenIntent } from './shell-launch.tsx'
@@ -543,12 +542,8 @@ function TerminalTool({ call }: { call: ToolCallView }) {
             <p className="font-mono text-[11px] text-muted-foreground">{details.sessionId}</p>
           )}
           {details?.truncated && <p className="text-warning">Earlier output truncated</p>}
-          {details?.secretOutput && (
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap">
-              <AnsiOutput output={details.secretOutput} />
-            </pre>
-          )}
         </div>
+        {details?.secretOutput && <ToolOutput output={details.secretOutput} />}
       </ToolContent>
     </Tool>
   )

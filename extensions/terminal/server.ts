@@ -60,15 +60,15 @@ function terminate(s: Session, leaderExited = false) {
   if (s.ended) return
   s.ended = true
   revoke(s)
+  let signalLeader = !leaderExited && process.platform !== 'darwin'
   try {
-    killSessionChildren(s.pty.pid, leaderExited)
+    if (killSessionChildren(s.pty.pid, leaderExited)) signalLeader = true
   } catch {
     console.error('Terminal process cleanup failed')
   } finally {
     try {
-      // #47345/review50791: node-pty onExit has already reaped the leader;
-      // signalling its PID there risks killing a newly reused, unrelated PID.
-      if (!leaderExited) s.pty.kill('SIGKILL')
+      // On Darwin the native wait can reap the leader before JS receives onExit.
+      if (signalLeader) s.pty.kill('SIGKILL')
     } catch (error) {
       if (errnoCode(error) !== 'ESRCH') console.error('Terminal PTY cleanup failed')
     }
