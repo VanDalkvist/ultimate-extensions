@@ -19,3 +19,11 @@ cp -r extensions/subscription-usage "$HOME/.ultimate/extensions/"
 ```
 
 Nothing else to install.
+
+## Ultimate 0.1
+
+The UI uses `web.solid.tsx` and the native Solid 2 SDK. It provides the same
+bottom status-line chip and subscription-usage panel; server providers, local
+cache and network requests are unchanged. Remove the obsolete installed
+`web.tsx` when upgrading the extension, otherwise Ultimate 0.1 displays an
+incompatible React facet error. No GitHub Actions are required.
