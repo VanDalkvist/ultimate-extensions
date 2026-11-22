@@ -154,3 +154,50 @@
 - Losing a protected command's response is *not* proof the command failed; reconcile, never kill a separate user session.
 - Browser keyboard shortcuts must be intercepted before the terminal's input handler and must be tested with browser platform semantics.
 - Installed extension CSS may require explicit theme-token fallbacks beyond the host Tailwind source scanner.
+
+
+## Cycle 3 — 2026-11-22 — Shell discovery and compact workspace chrome (PR #6)
+
+### Context / S0-S3
+- Scope: user-reported Bash 3.2 problem and excessive stacked Terminal chrome in actual macOS screenshot; follow-up explicitly authorized final architecture review **then merge**.
+- Branch: `fix/terminal-native-shell-and-workspace-chrome`, based on merged PR #5.
+- Source of truth: actual `node-pty.spawn('/bin/bash', ['--noprofile','--norc','-i'])` was the problem; `chsh` cannot change a hardcoded child executable.
+- Canon: `VanDalkvist/arch-improvement-skills/skills/arch-improvement-loop/SKILL.md`; memory: keep native PTY life separate from viewport, preserve read authorization, avoid false test success.
+- Context map: `server.ts` owns one privileged PTY and user/agent admission; `shells.ts` handles discovery/validation; `web.tsx`/picker displays local preference and calls `actions.open/approve`. Browser-stored shell path is untrusted input.
+
+### S4 Severity findings / S5 decisions
+1. **P1 fix-now: persistent default used a Solid-only SDK hook inside a React extension** — `web.tsx` imported `useExtensionUiState` but the available upstream SDK docs only declare the hook in `web/src/sdk/solid.ts`. Replace with React-compatible local browser preference + explicit same-origin/tab sync. Cross-device sync excluded.
+2. **P1 fix-now: agent approval lost on invalid shell selection** — `actions.approve` previously consumed `pending` before validating `args.shell`; a stale saved path would discard an approved request with zero shell. Validate first, then consume.
+3. **P2 fix-now: noninteractive executable or arbitrary path could have been selected** — fail-closed server-side candidate registry from `/etc/shells` and standard install paths, require absolute executable regular-file and recognized basename, do not consult arbitrary project PATH or execute discovery.
+4. **P2 fix-now: wrong fallback to inherited `$SHELL` / duplicate symlink paths** — prefer `node:os.userInfo().shell`, validate it, deduplicate candidates by realpath.
+5. **P2 fix-now: invalid saved shell allowed a Start click and generic failure** — disable start until available catalog and valid choice; give actionable guidance.
+6. **P2 fix-now: ARIA menuitemradio without arrow navigation** — convert to pressed-button group using native Tab/Escape semantics.
+7. **P2 fix-now: corrupted README plus inaccurate persistence promise** — rebuild the affected section; state browser-local persistence honestly.
+8. **P2 blocked: full frontend/native integration** — actual macOS/Linux Ultimate processes, compiled React and visual 1080p/narrow product checks are unavailable here.
+9. **P3 log-only: pre-existing PTY module globals and single-session design** — separate architecture task, out of shell selector scope.
+
+### S6-S7 Plan
+- Written plan: `docs/superpowers/plans/2026-11-22-terminal-shell-picker.md` and its final-review addendum.
+- Preserve native `authorized()`, PTY server cursor/ack, OS cleanup, 10-minute absolute deadline, explicit Start, manual/agent approval distinction.
+- No shell command injection via a path: `shellForStart` accepts only a re-discovered exact executable path; args are fixed `-l -i`; no `sh -c`, no extra server listener.
+- User-approved product goal: select zsh/bash/fish in Terminal and remember the default for future local sessions.
+
+### S8 Fixes
+- Added `shells.ts` and tests: read-only discovery, OS login shell, /etc/shells, platform paths, executable checks, realpath alias dedup, exact selected path enforcement.
+- Replaced hardcoded `/bin/bash` spawn with validated selected executable; metadata includes shell; user and agent approval paths share selection, and validation precedes consuming a pending request.
+- Added compact workspace toolbar with current shell, running dot, project path, Find/To agent, explicit grant and Stop. Removed redundant permanent PID/status strip. Responsive styles remain in extension-owned CSS.
+- Added `shell-preference-store.ts` + React `shell-preference.ts`, namespaced `localStorage` key and storage event, instead of assuming unsupported Solid hook. This stores path only, never shell output or capabilities.
+- Added honest no-shell/invalid-default handling and fixed README.
+- Old Bash-dependent native E2E tests pinned `/bin/bash` to retain their existing command execution assertions; augmented mocked native tests for discovery and invalid agent approvals.
+
+### S9 Verification & limitations
+- PASS: **10/10 actual Node v22 pure unit tests**, with Git blob SHA of tested shell discovery and preference files matching the PR. Covers macOS/Linux defaults, Homebrew fish, invalid shell injection, lack of executables, symlink aliases, blocked storage, persistence, corrupt preference.
+- PASS: **source-level API and entrypoint check**: one `node-pty.spawn(selected.path, ['-l','-i'])` behind fresh server-side validation; `userActions` includes discovery; browser picker and agent approval use same preference; no second PTY, new GitHub Actions, or permission weakening.
+- NOT RUN: native permissions test with `node-pty`/Pi SDK installed, full app typecheck/React bundle, real macOS/Linux zsh/fish startup, visual responsive layout, alt-screen TUI, cross-tab browser integration.
+- **S9 dual-circuit VERDICT: BLOCKED** — no false claim of full host verification. User explicitly requests merge after architecture review with these disclosed residuals.
+
+### S10-S11 Lessons
+- Shell default selection is a *display preference* until validated at the server-side privileged spawn boundary.
+- Avoid assuming SDK hooks exist across framework migrations; browser-safe persistence may be a better bounded compatibility shim.
+- Validate before consuming one-shot approvals, and do not confuse a user-controllable preference with permission to choose any OS executable.
+- Reconcile documentation/UX with actual behavior before release; structural CSS checks and pure tests do not replace live product verification.
