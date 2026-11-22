@@ -34,3 +34,17 @@ Date: 2026-11-22. Branch: `fix/terminal-native-shell-and-workspace-chrome`. Base
 - P2 (blocked): full TS bundle, real macOS/Linux PTY, render/layout and interactive TUI validation not run in connected runtime. Merge is user-authorized despite this known residual risk.
 - P3 (logged): existing server module-global PTY state and single process model predate this PR; no unrelated refactor.
 - Verification: 10/10 pure Node 22 tests (Git blob SHA matched); mocked node-pty permission tests written but not run with missing native SDK; structural review of all feature entrypoints.
+
+
+## 2026-11-22 — User-directed Solid 2 migration addendum (supersedes React-specific decisions)
+
+After finishing the shell picker, the user explicitly requested **rewrite the entire Terminal extension on Solid** in this PR. Previous references to React localStorage are superseded:
+
+- Facet: only \`web.solid.tsx\` using \`@/sdk/solid\`, \`@lucide/solid\`, current Solid 2 accessors and lifecycle.
+- Persistence: \`useExtensionUiState<string>('default-shell','system')\`, shared via Ultimate's durable UI store; no localStorage shim.
+- Renderer: direct \`new WTerm(element, { core, autoResize: true, webmcp: false })\` inside Solid lifecycle; WTerm DOM instance destroyed on Solid unmount while native PTY is detached/re-attached using existing tested lifecycle contracts.
+- Controls: Solid-specific shell picker, Find and agent share preview, preserving input security/destination checks.
+- Dependencies: remove \`@wterm/react\` and unused React packages from package/lock; keep \`@wterm/dom\`, \`@wterm/ghostty\`, \`node-pty\` pinned.
+- Tool approvals: read-only installed-shell picker also available at approval time, to avoid consuming a pending approval with an unavailable saved shell.
+- Verification: 19 SHA-matched pure Node tests pass; 20 source-level contracts pass. The real host compilation, UI and macOS/Linux PTY process checks remain unexecuted in this environment and require deployment smoke testing.
+- Final severity review is in \`docs/arch-improvement/review-log.md\` (Cycle 4), recorded *after* coding the Solid migration.
