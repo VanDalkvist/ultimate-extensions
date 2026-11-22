@@ -48,6 +48,14 @@ await test('launch approval and session grants gate native terminal access', asy
   const realNow = Date.now()
   const clock = mock.method(Date, 'now', () => realNow)
   try {
+    const catalog = (await actions.shells({}, ctx)) as {
+      systemDefault: string
+      shells: Array<{ path: string }>
+    }
+    assert.ok(catalog.shells.some(option => option.path === catalog.systemDefault))
+    assert.equal(spawn.mock.callCount(), 0, 'shell discovery must not create a PTY')
+    await assert.rejects(actions.open({ cols: 80, rows: 24, shell: '/tmp/project/zsh' }, ctx))
+    assert.equal(spawn.mock.callCount(), 0, 'invalid shell must be denied before spawn')
     assert.equal((await native('status')).state, 'denied')
     const denied = await native('open')
     assert.equal(spawn.mock.callCount(), 0)
@@ -76,6 +84,9 @@ await test('launch approval and session grants gate native terminal access', asy
     assert.ok(approved.sessionId)
     await assert.rejects(actions.approve({ requestId: request.requestId }, ctx))
     assert.equal(spawn.mock.callCount(), 1)
+    assert.equal(spawn.mock.calls[0].arguments[0], catalog.systemDefault,
+      'agent-owned shell uses the validated system default when no explicit selection is supplied')
+    assert.deepEqual(spawn.mock.calls[0].arguments[1], ['-l', '-i'])
     const access = await native('status')
     assert.equal(access.grant.conversation, 10)
     assert.equal(access.grant.expires, launchAt + 300_000)
