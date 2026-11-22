@@ -28,14 +28,17 @@ export function writeShellPreference(choice: string, storage: Store) {
  * useExtensionUiState hook; localStorage works across reloads/browser tabs.
  * The server always revalidates this untrusted preference before spawning.
  */
+function safeRead(): string {
+  if (typeof window === 'undefined') return 'system'
+  try { return readShellPreference(window.localStorage) } catch { return 'system' }
+}
+
 export function useTerminalShellPreference(): [string, (value: string) => void] {
-  const [choice, setChoice] = useState(() =>
-    typeof window === 'undefined' ? 'system' : readShellPreference(window.localStorage),
-  )
+  const [choice, setChoice] = useState(safeRead)
 
   useEffect(() => {
     function refresh() {
-      setChoice(readShellPreference(window.localStorage))
+      setChoice(safeRead())
     }
     function onStorage(event: StorageEvent) {
       if (event.key === shellPreferenceKey || event.key === null) refresh()
