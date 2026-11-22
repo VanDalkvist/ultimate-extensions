@@ -40,7 +40,9 @@ function SafeNode(props: { node: JSONContent }) {
       <Match when={props.node.type === 'taskList'}><ul>{children()}</ul></Match>
       <Match when={props.node.type === 'taskItem'}>
         <li>
-          <input type="checkbox" checked={!!props.node.attrs?.checked} disabled aria-label="Task status" />
+          <span aria-label={props.node.attrs?.checked ? 'Completed task' : 'Incomplete task'}>
+            {props.node.attrs?.checked ? '☑' : '☐'}
+          </span>
           {children()}
         </li>
       </Match>
