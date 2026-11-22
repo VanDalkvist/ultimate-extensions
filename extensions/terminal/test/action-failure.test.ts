@@ -26,6 +26,6 @@ test('other actions, extensions and unknown failures are not misclassified as re
 test('Solid terminal code never imports the optional SDK ActionError symbol', () => {
   for (const file of ['../web.solid.tsx', '../read-retry.ts']) {
     const source = readFileSync(new URL(file, import.meta.url), 'utf8')
-    assert.doesNotMatch(source, /import\\s*\\{[^}]*\\bActionError\\b[^}]*\\}\\s*from\\s*['"]@\\/sdk\\/solid['"]/)
+    assert.equal(source.includes('ActionError'), false)
   }
 })
