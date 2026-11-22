@@ -1,12 +1,14 @@
 import { GaugeIcon, PinIcon, RotateCwIcon } from '@lucide/solid'
 import { For, Show, createMemo, createSignal, onSettled } from 'solid-js'
 import { Button } from '@/components/ui/button.solid.tsx'
+import { StatusButton } from '@/components/ui/status-trigger.solid.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.solid.tsx'
 import {
   actionRef, api, cn, defineWebExtension, events, formatDuration, keepLast,
-  openPanel, useAction, useConversations, useEvent, useNow,
+  openPanel, showSurface, useAction, useConversations, useEvent, useNow,
 } from '@/sdk/solid'
 import type { ProviderId, ProviderUsage, UsageView, UsageWindow } from './types.ts'
+import { openUsageDetails } from './navigation.ts'
 
 const Status = actionRef<null, UsageView>('subscription-usage', 'status')
 const Refresh = actionRef<{ provider?: ProviderId; force?: boolean }, UsageView>(
@@ -269,14 +271,14 @@ function UsageStrip() {
   return (
     <Tooltip>
       <TooltipTrigger
-        aria-label="Открыть лимиты подписок"
-        onClick={() => openPanel('subscription-usage')}
         render={(trigger) => (
-          <Button {...trigger} size={null} variant={null}
-            class="flex min-w-0 max-w-52 items-center gap-2 overflow-hidden text-muted-foreground transition-colors hover:text-foreground md:max-w-80"
-            data-subscription-usage="strip" />
-        )}
-      >
+          <StatusButton
+            {...trigger}
+            aria-label="Открыть лимиты подписок"
+            onClick={() => openUsageDetails({ showSurface, openPanel })}
+            class="flex min-w-0 max-w-52 items-center gap-2 overflow-hidden md:max-w-80"
+            data-subscription-usage="strip"
+          >
         <GaugeIcon class="size-3 shrink-0" />
         <Show when={pinned().length > 0} fallback={<span>Usage{usage.error() ? ' !' : ' —'}</span>}>
           <span class="flex min-w-0 items-center gap-3 overflow-hidden">
@@ -295,7 +297,9 @@ function UsageStrip() {
             </For>
           </span>
         </Show>
-      </TooltipTrigger>
+          </StatusButton>
+        )}
+      />
       <TooltipContent class="max-w-80 border border-border bg-popover font-mono text-[11px] text-popover-foreground shadow-lg">
         <div class="space-y-2" data-subscription-usage="tooltip">
           <For each={usage.data()?.providers.slice(0, 3) ?? []} keyed={(item) => item.id}>
