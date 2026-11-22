@@ -1,6 +1,6 @@
-A bounded macOS and Linux terminal inside Ultimate: one real host PTY with an explicit Start/Stop and a choice of installed login shells.
+A bounded macOS and Linux terminal inside Ultimate: one real host PTY, automatically opened when you enter Terminal, with explicit Stop and a choice of installed login shells.
 
-**Open shell** in the title bar navigates to Terminal. Only **Start shell** or a separately approved agent request creates a new process.
+Entering the **Terminal** surface (including **Open shell** in the title bar) first checks for an existing PTY and reattaches it. If none is running and a valid shell is installed, it opens one automatically as a user-owned session. **Start shell** remains available after an explicit Stop or a failed start; agent-owned launches still require a separate approval.
 
 ![Terminal preview from the host before this revision](../../docs/terminal.png)
 
@@ -44,7 +44,7 @@ This extension uses Ultimate's current **Solid 2** facet (`web.solid.tsx`) and i
   after a natural shell exit because the controlling terminal can be reused.
 - On Agent → Terminal navigation, the new view inspects and reattaches to the same PTY, replaying up to 128 KiB
   of acknowledged output. Older output can be lost; this is byte replay, not an exact screen snapshot (full-screen
-  programs may need to redraw). No new process starts. A real browser page unload closes manually started shells.
+  programs may need to redraw). A browser page unload **detaches** the manually started shell and a reload inspects and reattaches it, provided the native core and the bounded session remain alive.
 - No dedicated listener, websocket, session catalog or persisted terminal state. A server restart loses the session;
   a transport failure does not reattach or extend it.
 
@@ -52,13 +52,15 @@ This extension uses Ultimate's current **Solid 2** facet (`web.solid.tsx`) and i
 
 Use the Ultimate host's Node version and architecture. On macOS, install the Xcode command-line tools and Python 3
 first. On Linux, see [node-pty's build prerequisites](https://github.com/microsoft/node-pty/tree/v1.1.0#dependencies).
-Then copy and install from the lockfile:
+For an already installed Terminal, synchronize source without replacing native dependencies:
 
 ```sh
-mkdir -p "$HOME/.ultimate/extensions"
-cp -r extensions/terminal "$HOME/.ultimate/extensions/"
-cd "$HOME/.ultimate/extensions/terminal" && npm ci
+bash scripts/install-terminal.sh "${PWD}"
 ```
+
+Run this from the project directory where Ultimate starts (or pass that directory as the argument) so an existing project-level extension cannot shadow the update. The installer backs up changed files, preserves `node_modules/node-pty`, and disables obsolete `web.tsx` rather than deleting it.
+
+For a **first-time** installation only, install native dependencies from the lockfile in `~/.ultimate/extensions/terminal` using `npm ci`.
 
 **macOS requires a source build after every `npm ci`.** The `node-pty` 1.1.0 prebuilt macOS arm64 package ships a
 non-executable `spawn-helper`; installing it successfully does not mean a shell can start. Run this from the installed
