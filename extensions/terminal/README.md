@@ -5,6 +5,13 @@ menu, the palette, tool cards and a restored view only navigate. **Start shell**
 
 ![Terminal: one shell, explicit start, its bounds in the header](../../docs/terminal.png)
 
+## Find and share with the agent
+
+- **Find** searches retained Ghostty/wterm history, with next/previous and match-case controls. Press **⌘F** on macOS or **Ctrl+Shift+F** on Linux. Linux Bash still gets its ordinary **Ctrl+F** key.
+- Select output in the terminal and choose **To agent**. Inspect/edit the preview before confirming. At most **12 KiB UTF-8** is queued as a follow-up to the current Ultimate conversation; output is framed as untrusted data. Nothing is sent automatically, and there is no implicit command execution or new agent grant. Cancel leaves the conversation unchanged.
+- The existing WTerm selection supports ordinary browser **Copy**; no second terminal renderer or xterm.js addon is installed.
+- See [Terminal Experience research](../../docs/terminal-experience-research-2026-11-22.md) for ready-made open-source patterns and the next shell-integration/command-block slices.
+
 ## Bounds
 
 - **The shell has full OS user privileges** and starts in the host's fixed project root. The project directory is not a
