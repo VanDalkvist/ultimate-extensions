@@ -44,7 +44,7 @@ This extension uses Ultimate's current **Solid 2** facet (`web.solid.tsx`) and i
   after a natural shell exit because the controlling terminal can be reused.
 - On Agent → Terminal navigation, the new view inspects and reattaches to the same PTY, replaying up to 128 KiB
   of acknowledged output. Older output can be lost; this is byte replay, not an exact screen snapshot (full-screen
-  programs may need to redraw). A browser page unload **detaches** the manually started shell and a reload inspects and reattaches it, provided the native core and the bounded session remain alive.
+  programs may need to redraw). A browser page unload **detaches** the manually started shell and a reload inspects and reattaches it, provided the native core and the bounded session remain alive. When the browser retains WTerm in BFCache, the view resumes from the last displayed byte cursor without replaying old history twice; a different PTY session clears the old view.
 - No dedicated listener, websocket, session catalog or persisted terminal state. A server restart loses the session;
   a transport failure does not reattach or extend it.
 
