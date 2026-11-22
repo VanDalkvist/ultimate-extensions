@@ -1,4 +1,4 @@
-import { constants, accessSync, readFileSync, statSync } from 'node:fs'
+import { constants, accessSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { userInfo } from 'node:os'
 import { basename, isAbsolute, normalize } from 'node:path'
 
@@ -13,6 +13,7 @@ export type ShellProbe = {
   loginShell?: string
   shellsFile?: string
   executable(path: string): boolean
+  identity?(path: string): string
 }
 
 /** The fixed paths cover system, Homebrew (both Mac architectures), and Linuxbrew.
@@ -36,10 +37,14 @@ export function detectShells(probe: ShellProbe): ShellCatalog {
   const seen = new Set<string>()
   for (const candidate of candidates) {
     const path = candidate.path
-    if (!isAbsolute(path) || normalize(path) !== path || seen.has(path)) continue
+    if (!isAbsolute(path) || normalize(path) !== path) continue
     const name = basename(path)
     if (!names.includes(name as SupportedShell) || !probe.executable(path)) continue
-    seen.add(path)
+    // /bin/bash and /usr/bin/bash can resolve to the same file on Linux.
+    // Keep whichever path was preferred by the login shell or OS registry.
+    const identity = probe.identity?.(path) ?? path
+    if (seen.has(identity)) continue
+    seen.add(identity)
     shells.push({ path, name: name as SupportedShell, origin: candidate.origin })
   }
   const preferred = [probe.loginShell, probe.platform === 'darwin' ? '/bin/zsh' : '/bin/bash']
@@ -61,6 +66,9 @@ export function installedShells(): ShellCatalog {
     platform: process.platform,
     loginShell,
     shellsFile,
+    identity(path) {
+      try { return realpathSync(path) } catch { return path }
+    },
     executable(path) {
       try {
         if (!statSync(path).isFile()) return false
