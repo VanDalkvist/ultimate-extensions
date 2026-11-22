@@ -8,10 +8,10 @@ Date: 2026-11-22. Branch: `fix/terminal-native-shell-and-workspace-chrome`. Base
 - Three stacked header/status rows consume space without increasing functionality.
 
 ## Decision
-- Add a bounded, read-only `shells` browser action returning installed supported interactive shells from `/etc/shells`, known macOS/Linux system/Homebrew locations and `$SHELL` when absolute. Never execute discovery candidates, never use `which` in arbitrary project PATH, never persist secrets.
+- Add a bounded, read-only `shells` browser action returning installed supported interactive shells from `/etc/shells`, known macOS/Linux system/Homebrew locations and the real OS account shell when absolute. Never execute discovery candidates, never use `which` in arbitrary project PATH, never persist secrets.
 - Supported launch adapters: `zsh`, `bash`, `fish`, with explicit `-l -i` per upstream docs. Avoid unsupported shell families until their launch and exit contracts are tested.
 - Each candidate must be an absolute executable regular file (allow symlink to a regular file) whose resolved basename is supported. A selected explicit absolute path must match the fresh discoverable list when the privileged open action runs, not just a client-provided string.
-- `System default` resolves `$SHELL` when verified, else /bin/zsh on macOS if installed, else Bash, else first discovered. The client receives the resolved default for display.
+- `System default` resolves the OS account login shell from `os.userInfo().shell` (fallback `$SHELL`) when verified, else /bin/zsh on macOS if installed, else Bash, else first discovered. The client receives the resolved default for display.
 - Persist only shell selector in Ultimate `useExtensionUiState('default-shell','system')`: supported by Ultimate SDK across reloads, shared tabs. This is *not* a trusted OS privilege boundary; server validates on every start. Changing default while shell runs changes the **next** shell only.
 - Keep one PTY, explicit trusted Start, device capability, deadlines, agent grants, no shell spawning during discovery. Do not run `chsh`, modify `/etc/shells`, or install packages.
 - Visually consolidate toolbar/status into a low-height shell workspace bar and optional error; preserve full OS access warning in tooltip/compact text.
