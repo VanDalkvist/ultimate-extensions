@@ -45,24 +45,31 @@ export function TerminalFind({ instance }: { instance: WTerm | null }) {
   }, [instance, visible, query, caseSensitive])
 
   useLayoutEffect(() => {
-    if (visible) input.current?.focus()
+    if (visible) {
+      input.current?.focus()
+      input.current?.select()
+    }
   }, [visible])
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      const target = event.target
-      if (target instanceof HTMLElement &&
-        (target.closest('[role="dialog"]') ||
-          (target !== input.current && target.matches('input, textarea, [contenteditable="true"]'))))
+      // Capture before WTerm's input handler can convert a shortcut into PTY
+      // bytes. Never hijack an editor, dialog or another input field.
+      const source = event.composedPath()[0]
+      if (source instanceof Element &&
+        (source.closest('[role="dialog"]') ||
+          (source !== input.current &&
+            source.closest('input, textarea, select, [contenteditable], [role="textbox"]'))))
         return
-      if (isTerminalFindShortcut(event) && instance) {
+      if (isTerminalFindShortcut(event, navigator.platform || navigator.userAgent) && instance) {
         event.preventDefault()
+        event.stopPropagation()
         setVisible(true)
         input.current?.select()
       }
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [instance])
 
   function close() {
@@ -80,7 +87,10 @@ export function TerminalFind({ instance }: { instance: WTerm | null }) {
         size="sm"
         title="Find in terminal output (⌘F / Ctrl+Shift+F)"
         variant="ghost"
-        onClick={() => setVisible((value) => !value)}
+        onClick={() => {
+          if (visible) close()
+          else setVisible(true)
+        }}
       >
         <SearchIcon className="size-3.5" />
         Find
@@ -88,6 +98,13 @@ export function TerminalFind({ instance }: { instance: WTerm | null }) {
       {visible && (
         <div
           aria-label="Terminal find"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              event.stopPropagation()
+              close()
+            }
+          }}
           className="absolute right-0 top-full z-30 mt-2 terminal-find-panel rounded-lg border border-border bg-background p-2 shadow-lg"
           role="search"
         >
@@ -103,11 +120,7 @@ export function TerminalFind({ instance }: { instance: WTerm | null }) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  close()
-                } else if (event.key === 'Enter') {
+                if (event.key === 'Enter') {
                   event.preventDefault()
                   if (event.shiftKey) instance?.findPrevious()
                   else instance?.findNext()
