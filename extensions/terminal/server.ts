@@ -343,14 +343,9 @@ export const actions = {
     const s = authorized(args, ctx)
     const cursor = integer(args.cursor, s.base, s.sent)
     if (args.ack !== undefined && args.ack !== true) throw fail()
-    if (ctx.signal.aborted) throw fail()
-    if (s.reading) {
-      // The previous view may have a pending long-poll; let it finish
-      // before the newly mounted view becomes the sole reader.
-      s.wake?.()
-      await Promise.resolve()
-      if (s.reading) throw fail()
-    }
+    // A competing reader must not steal the in-flight cursor or ack bytes.
+    // Authorized viewport handoff uses the explicit control/resize command.
+    if (s.reading || ctx.signal.aborted) throw fail()
     s.reading = true
     try {
       if (args.ack && cursor > s.base) acknowledge(s, cursor)
@@ -396,6 +391,9 @@ export const actions = {
       throw fail()
     if (args.cols !== undefined || args.rows !== undefined) {
       s.pty.resize(integer(args.cols, 1, 500), integer(args.rows, 1, 200))
+      // This is an authenticated command. The remounted view resizes first;
+      // wake an old long-poll before it starts reading from the retained base.
+      s.wake?.()
     }
     if (args.secretInput !== undefined) {
       if (
@@ -439,8 +437,7 @@ export const actions = {
     if (s && expired(s)) terminate(s)
     if (!s || s.ended || s.login !== ctx.device?.login || s.address !== ctx.device?.address)
       return null
-    // Wake a long-poll left behind by the previous viewport.
-    s.wake?.()
+    // Inspect is read-only: a passive view must not interrupt a reader.
     return {
       secretToken: s.secretToken,
       secretReplay: s.history.toString('base64'),
