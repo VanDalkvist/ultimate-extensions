@@ -201,3 +201,43 @@
 - Avoid assuming SDK hooks exist across framework migrations; browser-safe persistence may be a better bounded compatibility shim.
 - Validate before consuming one-shot approvals, and do not confuse a user-controllable preference with permission to choose any OS executable.
 - Reconcile documentation/UX with actual behavior before release; structural CSS checks and pure tests do not replace live product verification.
+
+
+## Cycle 4 — 2026-11-22 — Final Arch Review after full Solid 2 migration (PR #6)
+
+### S0–S3: scope and architecture
+- User explicitly extended PR #6 from React shell-picker work to **rewrite the whole Terminal web facet on Solid**, then perform final architecture review and merge. This supersedes the earlier draft hold.
+- Canonical host: \`HazAT/ultimate\` current \`extensions/README.md\` and \`skills/solid-ui/SKILL.md\`: a \`web.tsx\` facet is obsolete/error-card; correct contribution is \`web.solid.tsx\` with \`@/sdk/solid\`, \`@lucide/solid\`, Solid 2 accessors and \`onSettled\`.
+- UI trust diagram: Solid view → \`api.action\` → existing server-owned PTY; terminal output → WTerm DOM/Ghostty → opt-in preview → \`api.submit\` to immutable conversation. User-granted shell access is independent from output-to-agent share.
+- Reused previous PTY learning: user-owned shell survives surface detachment, but closes on page unload; agent-owned shell retains 30-second renewable lease; read has one ack cursor and no retry of writes.
+
+### Final severity-ranked findings and actions
+1. **P1 fixed — obsolete React facet would be rejected by modern Ultimate.** Removed \`web.tsx\` and React child components. Introduced exactly one \`web.solid.tsx\` and Solid child files, registering \`TerminalSurface\`, tool renderer and titlebar contribution through \`defineWebExtension\`.
+2. **P1 fixed — framework/SDK mismatch and lost persistent preference.** Replaced React localStorage shim with real Solid \`useExtensionUiState<string>('default-shell','system')\`; all readers use \`useAction\` accessors. Same durable selection is used by user and agent-approved opens and is validated server-side.
+3. **P1 fixed — direct browser terminal lifecycle could double-own / lose PTY.** Added \`terminal-emulator.solid.tsx\` to create/destroy exactly one \`WTerm\` at Solid \`onSettled\`, explicitly disable WebMCP, use \`@wterm/dom\` pinned 0.5.10 API. Reused unchanged \`terminalViewLifecycle\`, \`shellLaunch\`, read/ack/retry and serialized control queue; no second shell or session ownership introduced.
+4. **P2 fixed — old \`@/sdk\` ActionError import would fail after Solid port.** Moved framework-independent lifecycle/launch/retry helpers from \`.tsx\` to \`.ts\`, moved \`ActionError\` import to \`@/sdk/solid\`, and updated Vitest alias and regression test imports.
+5. **P2 fixed — unused React wrapper caused dependency/runtime drag.** Removed \`@wterm/react\` plus its orphan \`react\`, \`react-dom\`, \`scheduler\` lock nodes; package.json and lockfile root dependencies match exactly. Existing Ghostty core, DOM, node-pty and Pi versions unchanged.
+6. **P2 fixed — stale/default-unavailable shell could strand an approval.** Server validates shell before consuming one-shot approval; Solid ApprovalCard now reads shell catalog, lets the user select a valid shell in the approval itself, and disables approval until valid.
+7. **P2 fixed — UI controls still React-bound.** Reimplemented Find (keyboard capture and search callbacks), agent selection (12 KiB preview + fixed conversation + uncertainty guard) and shell picker (accessible native buttons) with Solid signals and lifecycle cleanup.
+8. **P2 accepted — design and client confidence.** Compact one-row toolbar leaves viewport dominant. CSS and WTerm DOM respond to host theme, but 1080p/narrow browser screenshot testing not possible here.
+9. **P2 blocked — black-box host verification.** No compiled current Ultimate running in this environment, so cannot execute official \`node scripts/check-extension.ts terminal\`, full typecheck, macOS/Linux PTY integration, Solid 2 component tests, or real tab/approval/product workflows.
+10. **P3 deferred — prior architecture debt.** The server's module-global single session and non-persistent shell transcript remain separate known debt; do not combine with Solid migration.
+
+### S6–S8 plan and execution
+- Existing plan \`docs/superpowers/plans/2026-11-22-terminal-shell-picker.md\` was amended by user scope while PR was in progress. The implementation retained a single end-to-end walking skeleton: \`web.solid.tsx\` → \`TerminalEmulator\` → \`WTerm.init\` → native \`actions.open/read/control\` → user-visible output → \`WTerm.destroy\`/detach.
+- Pure helpers remain single-source: \`shells.ts\` and tests, \`terminal-agent-context.ts\`, \`terminal-keybindings.ts\`; no hidden simulated server.
+- The \`web.tsx\` and all remaining non-Solid UI TSX files are removed. Tests previously named \`.test.tsx\` contain no JSX and are renamed to \`.test.ts\`; the user extension now has **one** \`web.solid.tsx\` facet.
+- No automatic GitHub workflow added; user requested manual Actions only.
+
+### S9 evidence
+- **PASS, unit:** 12/12 \`node --experimental-strip-types --test\` isolated tests for byte-bounded untrusted context, frozen conversation, delimiter/control attacks and macOS/Linux/Windows Find shortcuts.
+- **PASS, unit:** 7/7 isolated shell-discovery tests for account defaults, macOS/Linux paths, Homebrew fish, invalid injection paths and realpath aliases.
+- The six tested source/test Git blob SHA values all match the current PR files exactly (\`terminal-agent-context.ts\`, \`terminal-keybindings.ts\`, \`shells.ts\` and their three tests); these are actual Node v22.16.0 tests, not a fabricated static result.
+- **PASS, static:** 20/20 *source invariants* reviewed against committed branch: only Solid facet, no React import/dependencies, native WTerm mount/destroy, WebMCP disabled, server validation and single PTY, durable preference, user/agent approval, context-share boundary, keybinding capture, unchanged grant and read protocols.
+- **NOT RUN / BLOCKED:** full Ultimate build/typecheck, native mock permission suite under real deps, macOS/Linux Node-PTY process test, exact visual UI, TUI and cross-tab runtime. Source invariants cannot substitute for these.
+- **S9 dual-circuit result: BLOCKED**, not a full functional PASS. User explicitly requested to merge after this final review despite the unexecuted real-host validation. Do not misrepresent the result.
+
+### S10–S12 closure
+- Change surface: Terminal folder and arch docs only. No server permission relaxation, new Action trigger, second PTY, or shell command from search/preview.
+- Final disposition: suitable for a **user-authorized merge with disclosed runtime risk**; immediately follow up with actual Ultimate terminal smoke checks after deployment.
+- Post-merge branch hygiene: former PR #4 and #5 heads each have 0 commits ahead of \`main\`; safe to delete. Branch deletion needs a dedicated Git ref delete capability; do not pretend moving refs equals deletion.
