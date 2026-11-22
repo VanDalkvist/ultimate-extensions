@@ -103,7 +103,9 @@ it('does not carry a requested launch over from a discarded ready terminal', asy
   await Promise.resolve()
   expect(view.open).not.toHaveBeenCalled()
 })
-\n\nit('reattaches a manually started shell after the Terminal surface remounts', async () => {
+
+
+it('reattaches a manually started shell after the Terminal surface remounts', async () => {
   const first = surface()
   first.launch.ready(terminal)
   await Promise.resolve()
