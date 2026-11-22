@@ -4,9 +4,12 @@ import { terminalViewLifecycle } from '../../lifecycle.tsx'
 test.each([
   ['agent', 'failed', false],
   ['agent', 'leave', false],
+  ['agent', 'pagehide', false],
   ['agent', 'stop', true],
   ['user', 'failed', true],
-  ['user', 'leave', true],
+  ['user', 'leave', false],
+  ['user', 'pagehide', true],
+  ['user', 'stop', true],
 ] as const)('%s-owned view %s closes the shell: %s', (owner, callback, closes) => {
   const abort = new AbortController()
   let current: { owner: typeof owner; secretToken: string; abort: AbortController } | null = {

@@ -34,6 +34,7 @@ type Grant = { conversation: ConversationId; expires: number; generation: string
 type Metadata = { sessionId: string; owner: 'user' | 'agent'; grant: Grant | null }
 type Opened = Metadata & {
   secretToken: string
+  secretReplay?: string
   pid: number
   cwd: string
   cols: number
@@ -132,7 +133,7 @@ function TerminalSurface() {
   const [ready, setReady] = useState(false)
   const [launching, setLaunching] = useState(false)
 
-  const [{ stop, leave, failed }] = useState(() =>
+  const [{ stop, leave, pagehide, failed }] = useState(() =>
     terminalViewLifecycle({
       take() {
         const s = running.current
@@ -203,6 +204,13 @@ function TerminalSurface() {
       setOpened(value)
       setAccess(value)
       setState('Running')
+      if (existing && value.secretReplay) {
+        // Inspect replays only acknowledged bytes; Read starts at the live
+        // base cursor, so the same bytes are not rendered twice.
+        terminal.write(
+          Uint8Array.from(atob(value.secretReplay), (char) => char.charCodeAt(0)),
+        )
+      }
       terminal.focus()
       let cursor = value.cursor
       while (running.current === s) {
@@ -265,7 +273,7 @@ function TerminalSurface() {
     const disconnectIntent = openIntent.connect(launch.request)
     function hide() {
       launch.hide()
-      leave()
+      pagehide()
     }
     window.addEventListener('pagehide', hide)
     window.addEventListener('pageshow', launch.show)
@@ -277,7 +285,7 @@ function TerminalSurface() {
       window.removeEventListener('pagehide', hide)
       window.removeEventListener('pageshow', launch.show)
     }
-  }, [launch, leave])
+  }, [launch, leave, pagehide])
 
   useEffect(() => {
     let active = true
@@ -324,8 +332,8 @@ function TerminalSurface() {
                 {opened?.cwd ?? 'Fixed project directory · /bin/bash --noprofile --norc -i'}
               </p>
               <p>
-                Full OS user privileges · 10 minute trial · leaving detaches agent-owned shells;
-                user-owned shells stop
+                Full OS user privileges · 10-minute maximum · switching tabs keeps the
+                shell running · Stop ends it
               </p>
             </div>
             {opened && (

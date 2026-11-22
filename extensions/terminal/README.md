@@ -9,7 +9,8 @@ menu, the palette, tool cards and a restored view only navigate. **Start shell**
 
 - **The shell has full OS user privileges** and starts in the host's fixed project root. The project directory is not a
   sandbox: commands reach files and the network with your user's rights.
-- One active PTY, a 30 second renewable lease, ten minutes maximum lifetime. A pending launch approval lives 30 minutes
+- One active PTY, ten minutes maximum lifetime. Manually started shells remain active when switching Ultimate
+  surfaces; agent-owned shells retain their 30 second renewable lease. A pending launch approval lives 30 minutes
   and creates no process.
 - A 32 byte random capability bound to the admission login and address. Browser actions are user-only; this is not a
   sandbox against arbitrary code.
@@ -18,8 +19,11 @@ menu, the palette, tool cards and a restored view only navigate. **Start shell**
 - Close and expiry clean up jobs attached to the PTY, including foreground jobs in a separate process group. This is
   not containment: jobs that detach from the session can outlive it. On macOS, the extension does not scan for jobs
   after a natural shell exit because the controlling terminal can be reused.
-- No dedicated listener, websocket, reconnect, session catalog or persistent terminal state. A transport failure does not
-  reattach or extend the shell.
+- On Agent → Terminal navigation, the new view inspects and reattaches to the same PTY, replaying up to 128 KiB
+  of acknowledged output. Older output can be lost; this is byte replay, not an exact screen snapshot (full-screen
+  programs may need to redraw). No new process starts. A real browser page unload closes manually started shells.
+- No dedicated listener, websocket, session catalog or persisted terminal state. A server restart loses the session;
+  a transport failure does not reattach or extend it.
 
 ## Install
 

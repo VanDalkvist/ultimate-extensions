@@ -11,14 +11,18 @@ export function terminalViewLifecycle(options: {
   close(secretToken: string): Promise<unknown>
   changed(state: string, error: boolean): void
 }) {
-  function release(explicit: boolean, failure?: string) {
+  function release(explicit: boolean, failure?: string, pagehide = false) {
     const session = options.take()
     session?.abort.abort()
-    // #47345: concurrent UI readers can reject a stale cursor. Detaching a view
-    // must not kill an agent-owned shell that native tools are still using.
-    const detached = !explicit && session?.owner === 'agent'
+    // Switching Ultimate surfaces unmounts the view, not its PTY.
+    // Page unload, explicit Stop or a failed manual transport still close
+    // user shells. Agent-owned shells retain their existing detach policy.
+    const detached =
+      !!session &&
+      !explicit &&
+      (session.owner === 'agent' || (!pagehide && failure === undefined))
     if (session && !detached) {
-      // The server lease retries cleanup if the unload request cannot finish.
+      // The server deadline retries cleanup if this request cannot finish.
       void options.close(session.secretToken).catch(retriedLater)
     }
     options.changed(
@@ -33,6 +37,7 @@ export function terminalViewLifecycle(options: {
   return {
     stop: () => release(true),
     leave: () => release(false),
+    pagehide: () => release(false, undefined, true),
     failed: (reason = 'request failed') => release(false, reason),
   }
 }

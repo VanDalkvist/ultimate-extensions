@@ -7,7 +7,7 @@ const agent = { owner: 'agent' as const, secretToken: 'agent-test-token' }
 
 function surface() {
   let running = false
-  const inspect = vi.fn<() => Promise<typeof agent | null>>().mockResolvedValue(null)
+  const inspect = vi.fn<() => Promise<typeof user | typeof agent | null>>().mockResolvedValue(null)
   const open = vi.fn<(size: typeof terminal) => Promise<typeof user>>().mockResolvedValue(user)
   const attach = vi.fn<(value: typeof user | typeof agent) => void>(() => {
     running = true
@@ -102,4 +102,33 @@ it('does not carry a requested launch over from a discarded ready terminal', asy
   view.launch.ready({ ...terminal })
   await Promise.resolve()
   expect(view.open).not.toHaveBeenCalled()
+})
+
+
+it('reattaches a manually started shell after the Terminal surface remounts', async () => {
+  const first = surface()
+  first.launch.ready(terminal)
+  await Promise.resolve()
+  first.launch.request()
+  await Promise.resolve()
+  expect(first.open).toHaveBeenCalledOnce()
+  first.launch.disconnect()
+  first.stop()
+
+  const second = surface()
+  second.inspect.mockResolvedValueOnce(user)
+  second.launch.ready(terminal)
+  await Promise.resolve()
+  expect(second.attach).toHaveBeenCalledOnce()
+  expect(second.attach.mock.calls[0][0]).toBe(user)
+  expect(second.open).not.toHaveBeenCalled()
+
+  // "Open shell" is a navigation intent, not a second PTY launch.
+  const third = surface()
+  third.inspect.mockResolvedValueOnce(user)
+  third.launch.ready(terminal)
+  third.launch.request()
+  await Promise.resolve()
+  expect(third.attach).toHaveBeenCalledOnce()
+  expect(third.open).not.toHaveBeenCalled()
 })
