@@ -9,7 +9,7 @@ menu, the palette, tool cards and a restored view only navigate. **Start shell**
 
 The Shell dropdown discovers **installed** Zsh, Bash and Fish from `/etc/shells`, the login-shell environment and conventional system/Homebrew paths. A shell is offered only when its executable is present; it never installs packages or calls `chsh`.
 
-- **System default** picks your configured login `$SHELL` when verified, falling back to Zsh on macOS or Bash on Linux, if available.
+- **System default** picks your OS account's login shell (with `$SHELL` only as fallback) when verified, falling back to Zsh on macOS or Bash on Linux, if available.
 - Choose `/bin/zsh`, `/opt/homebrew/bin/zsh`, Bash or Fish to save that executable as the **Ultimate terminal default**. It persists via Ultimate's extension UI state across reloads/tabs, for user-started and approved agent-owned shells.
 - Selecting another shell never stops a running PTY. The selection applies when the next shell starts. The server re-discovers and validates the executable before every launch, not merely when displaying the menu.
 - Shells launch in login + interactive mode (`-l -i`) to load normal prompt, completion and user configuration. Your own startup scripts may enable history or run commands; this is a real OS shell, **not a sandbox**.
