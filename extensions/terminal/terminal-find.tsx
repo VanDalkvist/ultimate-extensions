@@ -88,7 +88,7 @@ export function TerminalFind({ instance }: { instance: WTerm | null }) {
       {visible && (
         <div
           aria-label="Terminal find"
-          className="absolute right-0 top-full z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-border bg-background p-2 shadow-lg"
+          className="absolute right-0 top-full z-30 mt-2 terminal-find-panel rounded-lg border border-border bg-background p-2 shadow-lg"
           role="search"
         >
           <div className="flex min-w-0 items-center gap-1">
