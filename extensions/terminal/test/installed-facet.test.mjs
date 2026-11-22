@@ -19,7 +19,7 @@ test('installed Terminal receives new lifecycle, retry and Solid modules without
     mkdirSync(scripts, { recursive: true })
     mkdirSync(join(dest, 'node_modules/node-pty'), { recursive: true })
     copyFileSync(source, join(scripts, 'install-terminal.sh'))
-    for (const name of ['README.md', 'web.solid.tsx', 'shell-launch.ts', 'lifecycle.ts', 'auto-start.ts', 'errors.ts', 'web.css']) {
+    for (const name of ['README.md', 'web.solid.tsx', 'shell-launch.ts', 'lifecycle.ts', 'auto-start.ts', 'terminal-replay.ts', 'errors.ts', 'web.css']) {
       writeFileSync(join(src, name), '// new ' + name)
     }
     writeFileSync(join(dest, 'web.tsx'), '// old facet')
@@ -29,6 +29,7 @@ test('installed Terminal receives new lifecycle, retry and Solid modules without
     })
     assert.equal(readFileSync(join(dest, 'auto-start.ts'), 'utf8'), '// new auto-start.ts')
     assert.equal(readFileSync(join(dest, 'shell-launch.ts'), 'utf8'), '// new shell-launch.ts')
+    assert.equal(readFileSync(join(dest, 'terminal-replay.ts'), 'utf8'), '// new terminal-replay.ts')
     assert.equal(existsSync(join(dest, 'web.tsx')), false)
     assert.ok(readdirSync(dest).some(name => name.startsWith('web.tsx.backup-')))
     assert.equal(readFileSync(join(dest, 'node_modules/node-pty/binding.node'), 'utf8'), 'native binding stays')
