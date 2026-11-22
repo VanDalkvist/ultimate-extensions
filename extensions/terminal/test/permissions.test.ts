@@ -76,6 +76,10 @@ await test('launch approval and session grants gate native terminal access', asy
     const request = await native('open')
     assert.equal((await native('open')).state, 'busy')
     assert.equal(spawn.mock.callCount(), 0)
+    await assert.rejects(actions.approve({ requestId: request.requestId, shell: '/tmp/fake-zsh' }, ctx))
+    assert.equal(spawn.mock.callCount(), 0, 'invalid approved shell cannot spawn')
+    assert.equal((await actions.approval({ requestId: request.requestId }, ctx) as { available: boolean }).available,
+      true, 'bad preference does not consume pending approval')
     const approved = (await actions.approve(
       { requestId: request.requestId, conversation: 99 },
       ctx,
