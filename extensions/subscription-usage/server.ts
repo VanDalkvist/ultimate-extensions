@@ -11,6 +11,7 @@ import {
   UsageFailure,
 } from './providers.ts'
 import type { Runtime } from './providers.ts'
+import { registerUsageLifetime } from './lifecycle.ts'
 import { PROVIDERS } from './types.ts'
 import type { ProviderId, ProviderUsage, UsageView } from './types.ts'
 
@@ -223,13 +224,9 @@ export const actions = {
 
 export default function subscriptionUsage(host: Host) {
   const instance = tracker(host)
-  // Current Ultimate has no onRelease(): each open gets a disposable scope.
-  // On a core swap, unload or restart, stop in-flight provider reads before
-  // the shared DB resource is closed by its process-level onClose callback.
-  host.onOpen(async (opened) => {
-    instance.open()
-    opened.defer(() => instance.close())
-  })
+  // Core swaps dispose the open scope, aborting provider work before the
+  // shared DB closes. No unsupported host.onRelease callback is required.
+  registerUsageLifetime(host, instance)
   return defineExtension({
     name: 'subscription-usage',
     hooks: [
