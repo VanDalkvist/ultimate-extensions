@@ -2,6 +2,7 @@ import type { WTerm } from '@wterm/dom'
 import { CaseSensitiveIcon, ChevronDownIcon, ChevronUpIcon, SearchIcon, XIcon } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { isTerminalFindShortcut } from './terminal-keybindings.ts'
 
 export type TerminalSearchState = {
   count: number
@@ -49,13 +50,12 @@ export function TerminalFind({ instance }: { instance: WTerm | null }) {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      // Bash uses Ctrl+F for forward-character. Only intercept Command+F
-      // on macOS, Ctrl+Shift+F elsewhere.
-      const key = event.key.toLowerCase()
-      const find = key === 'f' && !event.altKey &&
-        ((event.metaKey && !event.ctrlKey) ||
-          (event.ctrlKey && event.shiftKey && !event.metaKey))
-      if (find && instance) {
+      const target = event.target
+      if (target instanceof HTMLElement &&
+        (target.closest('[role="dialog"]') ||
+          (target !== input.current && target.matches('input, textarea, [contenteditable="true"]'))))
+        return
+      if (isTerminalFindShortcut(event) && instance) {
         event.preventDefault()
         setVisible(true)
         input.current?.select()
