@@ -434,8 +434,15 @@ export const actions = {
   }),
   inspect: guarded((_args, ctx) => {
     const s = session
-    if (s && expired(s)) terminate(s)
-    if (!s || s.ended || s.login !== ctx.device?.login || s.address !== ctx.device?.address)
+    // Expiry cleanup belongs to the timer, not this read-only query. Never
+    // disclose an expired session, even before the next timer tick.
+    if (
+      !s ||
+      s.ended ||
+      expired(s) ||
+      s.login !== ctx.device?.login ||
+      s.address !== ctx.device?.address
+    )
       return null
     // Inspect is read-only: a passive view must not interrupt a reader.
     return {
