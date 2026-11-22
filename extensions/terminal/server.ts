@@ -7,6 +7,7 @@ import { spawn, type IPty } from 'node-pty'
 import { errnoCode } from './errors.ts'
 import { readLongpollMs } from './refs.ts'
 import { killSessionChildren } from './session-processes.ts'
+import { installedShells, shellForStart } from './shells.ts'
 
 type Context = {
   host: { projectRoot: string }
@@ -35,6 +36,7 @@ type Session = {
   wake?: () => void
   lease: number
   deadline: number
+  shell: string
 }
 const historyLimit = 128 * 1024
 function expired(s: Session) {
@@ -61,7 +63,7 @@ function grant(s: Session, conversation: number) {
 }
 function metadata(s: Session) {
   if (s.grant && s.grant.expires <= Date.now()) revoke(s)
-  return { sessionId: s.id, owner: s.owner, grant: s.grant ?? null }
+  return { sessionId: s.id, owner: s.owner, grant: s.grant ?? null, shell: s.shell }
 }
 const fail = () => new Error('Terminal request failed')
 
@@ -266,14 +268,17 @@ export const userActions = [
   'grant',
   'revoke',
   'inspect',
+  'shells',
 ]
 export const pollActions = ['read']
 export const actions = {
+  shells: guarded(() => installedShells()),
   open: guarded((args, ctx) => {
     if (session && !session.ended) throw fail()
     const cols = integer(args.cols, 1, 500)
     const rows = integer(args.rows, 1, 200)
-    const pty = spawn('/bin/bash', ['--noprofile', '--norc', '-i'], {
+    const selected = shellForStart(args.shell, installedShells())
+    const pty = spawn(selected.path, selected.args, {
       name: 'xterm-256color',
       cols,
       rows,
@@ -301,6 +306,7 @@ export const actions = {
       incomplete: false,
       lease: Date.now() + 30_000,
       deadline: Date.now() + 600_000,
+      shell: selected.path,
     }
     session = s
     pty.onData((secretOutput) => {
