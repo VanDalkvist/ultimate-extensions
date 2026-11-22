@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { terminalResumePlan } from '../terminal-replay.ts'
+import { terminalResumePlan, captureRenderedSnapshot } from '../terminal-replay.ts'
 
 test('BFCache return to the same PTY keeps the screen and reads only after rendered cursor', () => {
   assert.deepEqual(
@@ -35,4 +35,13 @@ test('server buffer advancing after a hidden page cannot move cursor backward', 
     terminalResumePlan({ sessionId: 'same', cursor: 300 }, { sessionId: 'same', cursor: 175 }, true),
     { cursor: 300, replayHistory: false, resetOldScreen: false },
   )
+})
+
+test('pagehide before WTerm has rendered server history does not falsely skip replay', () => {
+  assert.equal(captureRenderedSnapshot({
+    sessionId: 'same', renderedCursor: 100, screenInitialized: false,
+  }), null)
+  assert.deepEqual(captureRenderedSnapshot({
+    sessionId: 'same', renderedCursor: 175, screenInitialized: true,
+  }), { sessionId: 'same', cursor: 175 })
 })
