@@ -17,6 +17,7 @@ test('Command+F opens Find on macOS without intercepting shell Ctrl+F', () => {
   assert.equal(isTerminalFindShortcut(key({ metaKey: true })), true)
   assert.equal(isTerminalFindShortcut(key({ ctrlKey: true })), false)
   assert.equal(isTerminalFindShortcut(key({ ctrlKey: true, metaKey: true })), false)
+  assert.equal(isTerminalFindShortcut(key({ metaKey: true, shiftKey: true })), false)
 })
 
 test('Ctrl+Shift+F searches on Linux, but ordinary Ctrl+F reaches Bash', () => {
