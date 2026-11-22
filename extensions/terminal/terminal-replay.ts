@@ -19,3 +19,16 @@ export function terminalResumePlan(
     resetOldScreen: retained !== null && !sameSession,
   }
 }
+
+/** A cursor is reusable only if the same DOM emulator has rendered history. */
+export function captureRenderedSnapshot(
+  running: {
+    sessionId: string
+    renderedCursor: number
+    screenInitialized: boolean
+  } | null,
+): TerminalResumeSnapshot | null {
+  return running?.screenInitialized
+    ? { sessionId: running.sessionId, cursor: running.renderedCursor }
+    : null
+}
