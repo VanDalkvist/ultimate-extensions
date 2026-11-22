@@ -244,8 +244,14 @@ function TerminalSurface() {
     launch.connect()
     const disconnectIntent = openIntent.connect(launch.request)
     const hide = () => { launch.hide(); pagehide() }
+    const restore = () => {
+      launch.show()
+      // BFCache restores an existing view without re-running its initial
+      // mount effect. Request once; shellLaunch will inspect before opening.
+      if (shellAvailable()) launch.request()
+    }
     window.addEventListener('pagehide', hide)
-    window.addEventListener('pageshow', launch.show)
+    window.addEventListener('pageshow', restore)
     let active = true
     let loaded: GhosttyCore | undefined
     void GhosttyCore.load({ wasmPath: wasmUrl, scrollbackLines: 1000, imageStorageLimit: 0 })
@@ -267,7 +273,7 @@ function TerminalSurface() {
       launch.disconnect()
       leave()
       window.removeEventListener('pagehide', hide)
-      window.removeEventListener('pageshow', launch.show)
+      window.removeEventListener('pageshow', restore)
       loaded?.dispose()
     }
   })
