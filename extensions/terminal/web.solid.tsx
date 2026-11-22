@@ -15,6 +15,7 @@ import {
 } from '@/sdk/solid'
 import { settled } from './errors.ts'
 import { autoStartOnVisit } from './auto-start.ts'
+import { terminalResumePlan, type TerminalResumeSnapshot } from './terminal-replay.ts'
 import { readActionFailure } from './action-failure.ts'
 import { terminalViewLifecycle } from './lifecycle.ts'
 import { readWithRetry } from './read-retry.ts'
@@ -61,6 +62,7 @@ type Running = Opened & {
   queue: Promise<unknown>
   pending: number
   count: number
+  renderedCursor: number
 }
 const closeShell = (secretToken: string) =>
   api.action(Close, { secretToken }, { keepalive: true })
@@ -110,6 +112,8 @@ function TerminalSurface() {
   const [changingGrant, setChangingGrant] = createSignal(false)
   const [terminalInstance, setTerminalInstance] = createSignal<WTerm | null>(null)
   let running: Running | null = null
+  // In-memory only: BFCache keeps the WTerm DOM but not its native read loop.
+  let retainedView: TerminalResumeSnapshot | null = null
   let mounted = false
   let grantInFlight = false
 
@@ -162,12 +166,15 @@ function TerminalSurface() {
     void settled(control({ secretInput: btoa(String.fromCharCode(...bytes)) }))
   }
   async function run(value: Opened, terminal: WTerm, existing: boolean) {
+    const replay = terminalResumePlan(value, retainedView, existing)
+    retainedView = null
     const session: Running = {
       ...value,
       abort: new AbortController(),
       queue: Promise.resolve(),
       pending: 0,
       count: 0,
+      renderedCursor: replay.cursor,
     }
     running = session
     try {
@@ -176,11 +183,12 @@ function TerminalSurface() {
       setOpened(value)
       setAccess(value)
       setState('Running')
-      if (existing && value.secretReplay) {
+      if (replay.resetOldScreen) terminal.write('\x1bc') // RIS to WTerm, never to PTY
+      if (replay.replayHistory && value.secretReplay) {
         terminal.write(Uint8Array.from(atob(value.secretReplay), (char) => char.charCodeAt(0)))
       }
       terminal.focus()
-      let cursor = value.cursor
+      let cursor = replay.cursor
       while (running === session) {
         const result = await readWithRetry(
           () => api.action(
@@ -198,6 +206,7 @@ function TerminalSurface() {
         setAccess(result)
         terminal.write(Uint8Array.from(atob(result.secretOutput), (char) => char.charCodeAt(0)))
         cursor = result.cursor
+        session.renderedCursor = cursor
         if (result.ended) {
           leave()
           setState('Stopped')
@@ -243,7 +252,14 @@ function TerminalSurface() {
     mounted = true
     launch.connect()
     const disconnectIntent = openIntent.connect(launch.request)
-    const hide = () => { launch.hide(); pagehide() }
+    const hide = () => {
+      if (running) retainedView = {
+        sessionId: running.sessionId,
+        cursor: running.renderedCursor,
+      }
+      launch.hide()
+      pagehide()
+    }
     const restore = () => {
       launch.show()
       // BFCache restores an existing view without re-running its initial
