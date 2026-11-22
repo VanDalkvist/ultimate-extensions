@@ -14,6 +14,7 @@ import {
   type SolidToolProps, type ToolCallView,
 } from '@/sdk/solid'
 import { settled } from './errors.ts'
+import { autoStartOnVisit } from './auto-start.ts'
 import { readActionFailure } from './action-failure.ts'
 import { terminalViewLifecycle } from './lifecycle.ts'
 import { readWithRetry } from './read-retry.ts'
@@ -227,6 +228,16 @@ function TerminalSurface() {
     changed(next, failure = false) { setState(next); setError(failure) },
     attach: (value, terminal, existing) => void run(value, terminal, existing),
   })
+
+  // Entering the Terminal surface is the intentional Start. Inspect always
+  // wins over Open, so navigating back to an active PTY cannot spawn another.
+  // The guard is scoped to this mounted view: changing shell settings or
+  // finishing a read does not generate extra launch requests.
+  const autoStart = autoStartOnVisit(launch.request)
+  createEffect(
+    () => ({ ready: ready(), installed: shellAvailable() }),
+    ({ ready: terminalReady, installed }) => { autoStart(terminalReady, installed) },
+  )
 
   onSettled(() => {
     mounted = true
