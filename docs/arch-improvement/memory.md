@@ -58,3 +58,12 @@
 - Use next time: discover read-only from bounded OS sources, persist only a path (never session or terminal secrets), verify again before privileged PTY spawn, and keep React/other framework compatibility explicit.
 - Additionally: validate a one-shot approval's dependencies before consuming that approval; an invalid saved preference must not discard the request.
 - Evidence: `extensions/terminal/{shells.ts,shell-preference-store.ts,shell-preference.ts,server.ts}`; `test/{shells.test.ts,shell-preference.test.ts,permissions.test.ts}`.
+
+
+## 2026-11-22 — A UI framework migration must include the entire extension facet
+- Context: Ultimate removed React compat: \`web.tsx\` was no longer loaded as a normal extension, even if the native \`server.ts\` and PTY actions worked.
+- Symptom: isolated React components, React-only hook assumptions, and \`@wterm/react\` dependencies contradicted the live Solid 2 SDK.
+- Remedy: register exactly one \`web.solid.tsx\`, use \`@/sdk/solid\` readers as accessors, use \`onSettled\` for WTerm DOM create/destroy and host event cleanup, use \`@lucide/solid\`, and prefer the host's durable \`useExtensionUiState\` to an ad hoc localStorage fallback.
+- Migration requires old facet deletion, package/lock pruning, and updating pure \`.tsx\` helpers/tests to \`.ts\`; preserving imports by accident may compile only under an obsolete host.
+- Verification discipline: source-level architecture invariants and pure Node tests are **not** full Solid/PTY integration or proof of visual quality; do not claim black-box product PASS without launching the host.
+- Evidence: \`extensions/terminal/web.solid.tsx\`, \`terminal-emulator.solid.tsx\`, \`terminal-controls.solid.tsx\`, \`test/web\`, \`package-lock.json\`.
