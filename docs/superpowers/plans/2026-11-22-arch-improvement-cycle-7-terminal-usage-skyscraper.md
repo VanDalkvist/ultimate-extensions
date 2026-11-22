@@ -28,7 +28,7 @@ User explicitly requested fixing Usage, Skyscraper, Terminal together via the fu
 ## S6 Lean plan (test-first slices)
 
 - [ ] Slice 0 / AP-075 walking skeleton: assert actual Ultimate extension discovery priority (`builtin,user,project`) and the installed facet path classification. A locally executable diagnosis must identify exactly why a project override would load React.
-- [ ] Slice 1 Usage: add pure functional test for navigating status click to Agent then right panel, and a deployment-manifest test for all relative Usage web imports. Fix `web.solid.tsx`/installer as needed.
+- [ ] Slice 1 Usage: add pure functional test for navigating status click to Agent then right panel, and a deployment-manifest test for all relative Usage web imports. Fix `web.solid.tsx`/installer as needed, including any already-present project-scoped Usage override (same winner-precedence rule as Skyscraper).
 - [ ] Slice 2 Terminal: add red/green unit tests for once-per-visit auto-start and reattachment without duplicated open; update `web.solid.tsx` wiring. Add red/green lifecycle test for `pagehide` detach and explicit Stop close.
 - [ ] Slice 3 Skyscraper: test discovery and install as read-only dry-run over fake dirs (including project override, symlinks and obsolete `web.tsx`); safely update its own repository's installer only. Avoid touching the game server.
 - [ ] Slice 3B Terminal deployment: add backup-preserving sync for the *installed* Terminal Solid/TS source files without replacing native `node_modules` or any session data; test a fake installed copy. Otherwise a GitHub fix still runs stale code locally.
