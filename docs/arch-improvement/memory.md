@@ -49,3 +49,12 @@
 - Cause: host Tailwind \`@source\` includes repo extensions, not necessarily personal extension directories.
 - Use next time: use project-owned stylesheet fallbacks for structural layout and built-in Ultimate theme variables; test nested narrow panel widths, not only viewport breakpoints.
 - Evidence: \`extensions/terminal/web.css\`, \`terminal-find.tsx\`, upstream \`web/src/index.css\`.
+
+
+## 2026-11-22 — Persistent shell selection crosses two trust boundaries
+- Context: PR #6, native Zsh/Bash/Fish discovery and browser preference in an older React-based Ultimate extension.
+- Symptom: hardcoded Bash ignored the account login shell; a cached arbitrary path or missing shell could be selected; a newer SDK advertised settings only through its Solid hook.
+- Cause: confusion between host login-shell configuration, client-preference storage, and server privilege boundary; framework SDK expectations drift across versions.
+- Use next time: discover read-only from bounded OS sources, persist only a path (never session or terminal secrets), verify again before privileged PTY spawn, and keep React/other framework compatibility explicit.
+- Additionally: validate a one-shot approval's dependencies before consuming that approval; an invalid saved preference must not discard the request.
+- Evidence: `extensions/terminal/{shells.ts,shell-preference-store.ts,shell-preference.ts,server.ts}`; `test/{shells.test.ts,shell-preference.test.ts,permissions.test.ts}`.
