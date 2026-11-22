@@ -132,3 +132,37 @@ it('reattaches a manually started shell after the Terminal surface remounts', as
   expect(third.attach).toHaveBeenCalledOnce()
   expect(third.open).not.toHaveBeenCalled()
 })
+
+it('returns from browser pagehide to an existing PTY without starting a duplicate', async () => {
+  const view = surface()
+  view.inspect.mockResolvedValue(user)
+  view.launch.ready(terminal)
+  await Promise.resolve()
+  expect(view.attach).toHaveBeenCalledOnce()
+  expect(view.open).not.toHaveBeenCalled()
+
+  // pagehide detaches the reader, but the native PTY remains alive.
+  view.stop()
+  view.launch.hide()
+  view.launch.show()
+  await Promise.resolve()
+  expect(view.inspect).toHaveBeenCalledTimes(2)
+  expect(view.attach).toHaveBeenCalledTimes(2)
+  expect(view.open).not.toHaveBeenCalled()
+})
+
+it('restores an interrupted inspect after BFCache pageshow and consumes one user launch', async () => {
+  const view = surface()
+  const first = Promise.withResolvers<typeof user | null>()
+  view.inspect.mockReturnValueOnce(first.promise)
+  view.launch.ready(terminal)
+  view.launch.hide()
+  view.launch.show()
+  view.launch.request() // one deliberate entry; first inspect is obsolete
+  first.resolve(null)
+  await Promise.resolve()
+  await Promise.resolve()
+  expect(view.inspect).toHaveBeenCalledTimes(2)
+  await Promise.resolve()
+  expect(view.open).toHaveBeenCalledOnce()
+})
