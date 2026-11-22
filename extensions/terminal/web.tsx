@@ -21,6 +21,7 @@ import {
   StatusLine,
   useAction,
   useConversation,
+  useExtensionUiState,
   useUltimate,
 } from '@/sdk'
 import type { ToolCallView } from '@/sdk'
@@ -30,6 +31,8 @@ import { readWithRetry } from './read-retry.tsx'
 import { shellLaunch, shellOpenIntent } from './shell-launch.tsx'
 import { TerminalFind } from './terminal-find.tsx'
 import { TerminalAgentSelection } from './terminal-agent-selection.tsx'
+import { TerminalShellPicker } from './terminal-shell-picker.tsx'
+import type { ShellCatalog } from './shells.ts'
 import './web.css'
 
 type Grant = { conversation: ConversationId; expires: number; generation: string }
@@ -39,6 +42,7 @@ type Opened = Metadata & {
   secretReplay?: string
   pid: number
   cwd: string
+  shell: string
   cols: number
   rows: number
   cursor: number
@@ -54,7 +58,8 @@ type Control = {
   cols?: number
   rows?: number
 }
-const Open = actionRef<{ cols: number; rows: number }, Opened>('terminal', 'open')
+const Open = actionRef<{ cols: number; rows: number; shell: string }, Opened>('terminal', 'open')
+const Shells = actionRef<Record<string, never>, ShellCatalog>('terminal', 'shells')
 const Read = actionRef<{ secretToken: string; cursor: number; ack?: true }, Reply>(
   'terminal',
   'read',
@@ -124,6 +129,10 @@ function OpenShellButton() {
 
 function TerminalSurface() {
   const conversation = useConversation((value) => value.id)
+  const [defaultShell, setDefaultShell] = useExtensionUiState('default-shell', 'system')
+  const shellChoiceRef = useRef(defaultShell)
+  shellChoiceRef.current = defaultShell
+  const detectedShells = useAction(Shells, {})
   const [access, setAccess] = useState<Metadata>()
   const [core, setCore] = useState<GhosttyCore>()
   const [state, setState] = useState('Loading terminal…')
@@ -260,7 +269,7 @@ function TerminalSurface() {
   const [launch] = useState(() =>
     shellLaunch<WTerm, Opened>({
       inspect: () => api.action(Inspect, {}),
-      open: (size) => api.action(Open, size),
+      open: (size) => api.action(Open, { ...size, shell: shellChoiceRef.current }),
       close: closeShell,
       running: () => running.current !== null,
       busy: setLaunching,
@@ -331,15 +340,26 @@ function TerminalSurface() {
               Terminal
             </span>
           </Header>
-          <div className="terminal-toolbar flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border/70 px-3 py-2">
-            <div className="terminal-summary min-w-0 flex-1 text-[11px] text-muted-foreground">
-              <p className="truncate font-mono">
-                {opened?.cwd ?? 'Fixed project directory · /bin/bash --noprofile --norc -i'}
-              </p>
-              <p>
-                Full OS access · Bash · 10-minute maximum · Stop ends the shell
-              </p>
-            </div>
+          <div className="terminal-toolbar flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border/70 px-3 py-1.5">
+            <TerminalShellPicker
+              catalog={detectedShells.data}
+              value={defaultShell}
+              runningShell={opened?.shell}
+              onChange={setDefaultShell}
+            />
+            <span
+              className="terminal-session-indicator"
+              title={opened
+                ? `PID ${opened.pid} · ${opened.owner === 'agent' ? '30-second renewable lease' : '10-minute maximum'} · full OS user privileges`
+                : 'Shell starts only on your request and has full OS user privileges'}
+            >
+              <span className={opened ? 'terminal-dot terminal-dot-on' : 'terminal-dot'} />
+              {opened ? 'Running' : 'Ready'}
+            </span>
+            <span className="terminal-project-path" title={opened?.cwd ?? 'Project directory'}>
+              {opened?.cwd ?? 'Project directory'}
+            </span>
+            <div className="terminal-toolbar-actions ml-auto flex items-center gap-1">
             <TerminalFind instance={terminalInstance} />
             <TerminalAgentSelection instance={terminalInstance} conversation={conversation} />
             {opened && (
@@ -383,8 +403,8 @@ function TerminalSurface() {
                 {changingGrant
                   ? 'Updating access…'
                   : access?.grant
-                    ? 'Revoke shell control'
-                    : 'Allow shell control · 5 min'}
+                    ? 'Revoke control'
+                    : 'Grant control · 5m'}
               </Button>
             )}
             <Button
@@ -398,31 +418,14 @@ function TerminalSurface() {
             >
               {opened ? 'Stop' : 'Start shell'}
             </Button>
-          </div>
-          {!opened ? (
-            <div
-              role={error ? 'alert' : 'status'}
-              className={`mx-3 my-2 rounded-md px-3 py-2 text-[12px] ${error ? 'border border-error/30 bg-error/5 text-error' : 'text-muted-foreground'}`}
-            >
-              {state}
             </div>
-          ) : (
-            <div
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/50 px-3 py-1.5 font-mono text-[10px] text-muted-foreground"
-              role={error ? 'alert' : 'status'}
-            >
-              <span className={error ? 'text-error' : 'text-foreground'}>{state}</span>
-              <span>PID {opened.pid}</span>
-              <span title={access?.grant
-                ? 'Agent can read and write the shell until ' + new Date(access.grant.expires).toLocaleTimeString()
-                : 'Agent has no access to this shell'}>
-                {access?.grant ? 'Agent granted · 5 min max' : 'Agent off'}
-              </span>
-              <span className="ml-auto">
-                {opened.owner === 'agent'
-                  ? 'Agent-owned · 30-second renewable lease'
-                  : 'Manual shell · closes on reload or after 10 min'}
-              </span>
+          </div>
+          {error && (
+            <div className="terminal-message-error" role="alert">{state}</div>
+          )}
+          {!opened && !error && (
+            <div className="terminal-idle-hint" role="status">
+              New sessions open in the project directory · full OS access · 10-minute maximum
             </div>
           )}
           {core && (
