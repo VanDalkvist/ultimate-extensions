@@ -9,7 +9,7 @@ A bounded macOS and Linux terminal inside Ultimate: one real host PTY with an ex
 The Shell menu discovers installed **Zsh**, **Bash** and **Fish**, using the OS account's login shell, `/etc/shells`, and standard system/Homebrew/Linuxbrew locations. Discovery does not spawn a command or change the OS configuration.
 
 - **System default** resolves the OS account login shell (falling back to the verified `$SHELL`, then macOS Zsh or Linux Bash).
-- Selecting an explicit executable such as `/bin/zsh` saves the default in Ultimate's durable **extension UI state** (`ext.terminal.default-shell`). This state survives reloads/restarts and is shared between Ultimate tabs/devices through the host's supported state mechanism.
+- Selecting an explicit executable such as `/bin/zsh` saves the default in Ultimate's durable **extension UI state** (`ext.terminal.default-shell`). This state survives reloads/restarts and is shared between Ultimate tabs through the host's supported state mechanism.
 - A selection applies to **future** manual and agent-approved shells; it does not interrupt the running session. On every start, the server validates the selected path again against installed executable shells.
 - Shells start with `-l -i`, so personal shell startup scripts can run. They have **full OS user privileges**, not sandbox restrictions. A user script may override the history settings.
 - Changing the account's login shell with `chsh` does not change a terminal that was explicitly launched as Bash. This version removes the hardcoded Bash executable.
