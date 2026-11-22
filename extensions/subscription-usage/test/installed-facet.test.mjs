@@ -39,3 +39,31 @@ test('install includes new relative imports, preserves existing data and disable
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('project-scoped Usage override is updated with navigation.ts and backed up', () => {
+  const root = mkdtempSync(join(tmpdir(), 'usage-project-override-'))
+  try {
+    const checkout = join(root, 'checkout')
+    const home = join(root, 'home')
+    const project = join(root, 'project')
+    const sourceFolder = join(checkout, 'extensions/subscription-usage')
+    const scripts = join(checkout, 'scripts')
+    const projectFacet = join(project, '.ultimate/extensions/subscription-usage')
+    mkdirSync(sourceFolder, { recursive: true })
+    mkdirSync(scripts, { recursive: true })
+    mkdirSync(projectFacet, { recursive: true })
+    copyFileSync(source, join(scripts, 'install-subscription-usage.sh'))
+    for (const file of ['README.md', 'web.solid.tsx', 'server.ts', 'lifecycle.ts', 'navigation.ts']) {
+      writeFileSync(join(sourceFolder, file), '// new ' + file)
+    }
+    writeFileSync(join(projectFacet, 'web.tsx'), '// old React')
+    writeFileSync(join(projectFacet, 'local-note.json'), '{"keep":true}')
+    execFileSync('bash', [join(scripts, 'install-subscription-usage.sh'), project], {
+      encoding: 'utf8', env: { ...process.env, HOME: home },
+    })
+    assert.equal(readFileSync(join(projectFacet, 'navigation.ts'), 'utf8'), '// new navigation.ts')
+    assert.equal(existsSync(join(projectFacet, 'web.tsx')), false)
+    assert.ok(readdirSync(projectFacet).some(name => name.startsWith('web.tsx.backup-')))
+    assert.equal(readFileSync(join(projectFacet, 'local-note.json'), 'utf8'), '{"keep":true}')
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
