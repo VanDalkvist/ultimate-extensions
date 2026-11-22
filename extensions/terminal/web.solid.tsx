@@ -8,12 +8,13 @@ import { Show, createEffect, createSignal, onSettled } from 'solid-js'
 import { Button } from '@/components/ui/button.solid.tsx'
 import { Tool, ToolContent, ToolHeader, ToolOutput } from '@/components/ai/tool.solid.tsx'
 import {
-  actionRef, ActionError, api, attention, Card, defineWebExtension,
+  actionRef, api, attention, Card, defineWebExtension,
   Header, Sidebar, StatusLine, showSurface, useAction,
   useConversationId, useExtensionUiState,
   type SolidToolProps, type ToolCallView,
 } from '@/sdk/solid'
 import { settled } from './errors.ts'
+import { readActionFailure } from './action-failure.ts'
 import { terminalViewLifecycle } from './lifecycle.ts'
 import { readWithRetry } from './read-retry.ts'
 import { shellLaunch, shellOpenIntent } from './shell-launch.ts'
@@ -207,11 +208,11 @@ function TerminalSurface() {
     } catch (cause) {
       if (running === session) {
         failed(
-          cause instanceof ActionError && cause.action === 'read'
-            ? cause.status === 0
-              ? 'connection to shell lost while reading'
-              : 'shell output request rejected'
-            : undefined,
+          readActionFailure(cause) === 'transport'
+            ? 'connection to shell lost while reading'
+            : readActionFailure(cause) === 'rejected'
+              ? 'shell output request rejected'
+              : undefined,
         )
       }
     }
