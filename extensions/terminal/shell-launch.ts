@@ -123,7 +123,13 @@ export function shellLaunch<Term extends Dimensions, Session extends Shell>(opti
       void prepare()
     },
     request(this: void) {
-      if (!connected || hidden || options.running() || phase === 'open') return
+      if (!connected || hidden || options.running()) return
+      if (phase === 'open') {
+        // An old in-flight Open will be closed if its epoch was hidden.
+        // Preserve the fresh return intent so a new inspection follows it.
+        if (inspectedEpoch !== epoch) requested = true
+        return
+      }
       if (phase === 'inspect' && inspectedEpoch !== epoch) {
         // A request made after pageshow must survive the old inspect's
         // cancellation; the finally block starts a fresh inspection.
