@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest'
-import { shellLaunch, shellOpenIntent } from '../../shell-launch.tsx'
+import { shellLaunch, shellOpenIntent } from '../../shell-launch.ts'
 
 const terminal = { cols: 80, rows: 24 }
 const user = { owner: 'user' as const, secretToken: 'user-test-token' }
