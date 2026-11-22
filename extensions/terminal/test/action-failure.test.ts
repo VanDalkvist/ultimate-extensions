@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { readFileSync } from 'node:fs'
 import { readActionFailure } from '../action-failure.ts'
 
 test('transport error for terminal read is retryable', () => {
@@ -19,5 +20,12 @@ test('other actions, extensions and unknown failures are not misclassified as re
     { extension: 'other', action: 'read', status: 0 },
   ]) {
     assert.equal(readActionFailure(other), null)
+  }
+})
+
+test('Solid terminal code never imports the optional SDK ActionError symbol', () => {
+  for (const file of ['../web.solid.tsx', '../read-retry.ts']) {
+    const source = readFileSync(new URL(file, import.meta.url), 'utf8')
+    assert.doesNotMatch(source, /import\\s*\\{[^}]*\\bActionError\\b[^}]*\\}\\s*from\\s*['"]@\\/sdk\\/solid['"]/)
   }
 })
