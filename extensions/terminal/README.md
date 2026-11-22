@@ -5,6 +5,15 @@ menu, the palette, tool cards and a restored view only navigate. **Start shell**
 
 ![Terminal: one shell, explicit start, its bounds in the header](../../docs/terminal.png)
 
+## Find and share with the agent
+
+- **Find** searches only WTerm's retained output, with next/previous and match-case controls. Press **⌘F** on macOS, **Ctrl+Shift+F** on Linux/Windows; ordinary **Ctrl+F** remains Bash's readline shortcut. Closing Find restores focus to the shell. On compact viewports the popover stays inside the screen.
+- **To agent** shares only a manually selected range, after an editable preview and explicit confirmation. The destination conversation is **frozen when the preview opens**: switching conversations blocks the send rather than silently redirecting potentially private logs. Maximum **12 KiB UTF-8** selected text, **24 KiB** once encoded. Control characters and fake boundary markers are represented as one quoted JSON data value, not executable instructions; this framing **cannot guarantee** immunity to prompt injection.
+- No selection is captured or uploaded automatically. **To agent never grants shell access**. **Allow shell control** is a separate, high-privilege server-authorized command granting the agent read/write access to the real OS shell for up to five minutes. Removing/renewing access and sharing text must not be confused.
+- If message delivery is not confirmed due to a network failure, **check the destination conversation before sending again**: a failed response does not prove rejection, and the preview disables blind resubmission. The client does not log or persist this selection; the confirmed message becomes part of the chosen agent conversation.
+- The existing WTerm selection supports ordinary browser **Copy**; no second terminal renderer or xterm.js addon is installed.
+- See [Terminal Experience research](../../docs/terminal-experience-research-2026-11-22.md) for ready-made open-source patterns and the next shell-integration/command-block slices.
+
 ## Bounds
 
 - **The shell has full OS user privileges** and starts in the host's fixed project root. The project directory is not a

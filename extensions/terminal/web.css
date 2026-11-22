@@ -1,3 +1,8 @@
+.terminal-summary {
+  flex: 1 1 14rem;
+}
+
+/* The host may have a narrow panel inside a wide browser window. */
 /* #47345: project-only responsive utilities are not emitted by the host scanner. */
 @media (width < 40rem) {
   .terminal-toolbar {
@@ -6,5 +11,79 @@
 
   .terminal-summary {
     flex-basis: 100%;
+  }
+}
+
+/* WTerm controls live inside Ultimate's shared theme, but the host CSS
+   scanner cannot emit classes introduced only by this extension. */
+.terminal-find-panel {
+  width: min(22rem, calc(100vw - 2rem));
+}
+
+/* Installed user extensions can sit outside Ultimate's Tailwind @source
+   paths. Keep layout-critical chrome usable without generated utilities. */
+.terminal-find-panel {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 100%;
+  z-index: 30;
+  box-sizing: border-box;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 0.5rem);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 12px 36px oklch(0 0 0 / 0.22);
+}
+.terminal-find-panel > div:first-child {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.25rem;
+}
+.terminal-find-input {
+  flex: 1 1 0;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius, 0.5rem) - 2px);
+  background: var(--background);
+  color: var(--foreground);
+  font: 12px var(--font-mono, monospace);
+}
+.terminal-find-input:focus-visible,
+.terminal-agent-preview:focus-visible {
+  outline: 1px solid var(--ring);
+  outline-offset: 1px;
+}
+.terminal-agent-preview {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 9rem;
+  max-height: 18rem;
+  resize: vertical;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius, 0.5rem) - 2px);
+  background: var(--background);
+  color: var(--foreground);
+  font: 12px/1.5 var(--font-mono, monospace);
+}
+
+/* This rule comes after the fallback defaults to override positioning when
+   the narrow-screen layout must not allow the search panel to overflow. */
+@media (width < 40rem) {
+  .terminal-find-panel {
+    position: fixed;
+    inset-inline: 0.75rem;
+    top: var(--terminal-find-top, 6rem);
+    width: auto;
+    max-height: calc(100dvh - var(--terminal-find-top, 6rem) - 0.75rem);
+    margin-top: 0;
+    overflow-y: auto;
   }
 }

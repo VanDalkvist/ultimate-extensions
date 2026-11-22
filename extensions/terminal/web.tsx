@@ -28,6 +28,8 @@ import { Tool, ToolHeader, ToolContent, ToolOutput } from '@/components/ai/tool'
 import { terminalViewLifecycle } from './lifecycle.tsx'
 import { readWithRetry } from './read-retry.tsx'
 import { shellLaunch, shellOpenIntent } from './shell-launch.tsx'
+import { TerminalFind } from './terminal-find.tsx'
+import { TerminalAgentSelection } from './terminal-agent-selection.tsx'
 import './web.css'
 
 type Grant = { conversation: ConversationId; expires: number; generation: string }
@@ -132,6 +134,9 @@ function TerminalSurface() {
   const mounted = useRef(false)
   const [ready, setReady] = useState(false)
   const [launching, setLaunching] = useState(false)
+  const [changingGrant, setChangingGrant] = useState(false)
+  const grantInFlight = useRef(false)
+  const [terminalInstance, setTerminalInstance] = useState<WTerm | null>(null)
 
   const [{ stop, leave, pagehide, failed }] = useState(() =>
     terminalViewLifecycle({
@@ -326,36 +331,60 @@ function TerminalSurface() {
               Terminal
             </span>
           </Header>
-          <div className="terminal-toolbar flex items-center gap-3 border-b border-border/70 px-3 py-2">
+          <div className="terminal-toolbar flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border/70 px-3 py-2">
             <div className="terminal-summary min-w-0 flex-1 text-[11px] text-muted-foreground">
               <p className="truncate font-mono">
                 {opened?.cwd ?? 'Fixed project directory · /bin/bash --noprofile --norc -i'}
               </p>
               <p>
-                Full OS user privileges · 10-minute maximum · switching tabs keeps the
-                shell running · Stop ends it
+                Full OS access · Bash · 10-minute maximum · Stop ends the shell
               </p>
             </div>
+            <TerminalFind instance={terminalInstance} />
+            <TerminalAgentSelection instance={terminalInstance} conversation={conversation} />
             {opened && (
               <Button
                 size="sm"
                 variant="outline"
+                disabled={changingGrant || (!access?.grant && conversation === undefined)}
+                title="Grant or revoke full read/write control of this OS-privileged shell; sharing a selection does not grant access"
                 onClick={async () => {
+                  if (grantInFlight.current) return
+                  grantInFlight.current = true
+                  setChangingGrant(true)
                   try {
-                    setAccess(
-                      access?.grant
-                        ? await api.action(Revoke, { secretToken: opened.secretToken })
-                        : await api.action(GrantAction, {
-                            secretToken: opened.secretToken,
-                            conversation: conversation!,
-                          }),
-                    )
+                    const updated = access?.grant
+                      ? await api.action(Revoke, { secretToken: opened.secretToken })
+                      : await api.action(GrantAction, {
+                          secretToken: opened.secretToken,
+                          conversation: conversation!,
+                        })
+                    setAccess(updated)
+                    setError(false)
+                    setState('Running')
                   } catch {
-                    failed()
+                    // A failed grant/revoke response is not a terminal fault.
+                    // The command may have succeeded despite network failure:
+                    // reconcile the effective server-side permission via Inspect.
+                    try {
+                      const current = await api.action(Inspect, {})
+                      if (current?.sessionId === opened.sessionId) setAccess(current)
+                    } catch {
+                      // Leave the shell alive and report uncertain access.
+                    }
+                    setState('Shell access change not confirmed · check status before retrying')
+                    setError(true)
+                  } finally {
+                    grantInFlight.current = false
+                    setChangingGrant(false)
                   }
                 }}
               >
-                {access?.grant ? 'Revoke agent access' : `Grant #${conversation} · 5 min`}
+                {changingGrant
+                  ? 'Updating access…'
+                  : access?.grant
+                    ? 'Revoke shell control'
+                    : 'Allow shell control · 5 min'}
               </Button>
             )}
             <Button
@@ -370,22 +399,32 @@ function TerminalSurface() {
               {opened ? 'Stop' : 'Start shell'}
             </Button>
           </div>
-          <div
-            role={error ? 'alert' : 'status'}
-            className={`m-3 rounded-lg border p-3 text-[12px] ${error ? 'border-error/30 bg-error/5' : 'border-border/70 text-muted-foreground'}`}
-          >
-            {state}
-            {opened && (
-              <p className="mt-1 text-muted-foreground">
-                {access?.grant
-                  ? `Granted #${access.grant.conversation} until ${new Date(access.grant.expires).toLocaleTimeString()}`
-                  : 'Agent access off'}{' '}
-                · {access?.sessionId} · Output enters the granted conversation. Agent close only for
-                agent-owned shells; arbitrary write can still exit any granted shell (not a command
-                sandbox).
-              </p>
-            )}
-          </div>
+          {!opened ? (
+            <div
+              role={error ? 'alert' : 'status'}
+              className={`mx-3 my-2 rounded-md px-3 py-2 text-[12px] ${error ? 'border border-error/30 bg-error/5 text-error' : 'text-muted-foreground'}`}
+            >
+              {state}
+            </div>
+          ) : (
+            <div
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/50 px-3 py-1.5 font-mono text-[10px] text-muted-foreground"
+              role={error ? 'alert' : 'status'}
+            >
+              <span className={error ? 'text-error' : 'text-foreground'}>{state}</span>
+              <span>PID {opened.pid}</span>
+              <span title={access?.grant
+                ? 'Agent can read and write the shell until ' + new Date(access.grant.expires).toLocaleTimeString()
+                : 'Agent has no access to this shell'}>
+                {access?.grant ? 'Agent granted · 5 min max' : 'Agent off'}
+              </span>
+              <span className="ml-auto">
+                {opened.owner === 'agent'
+                  ? 'Agent-owned · 30-second renewable lease'
+                  : 'Manual shell · closes on reload or after 10 min'}
+              </span>
+            </div>
+          )}
           {core && (
             <Terminal
               className="min-h-0 flex-1 overflow-hidden font-mono"
@@ -407,6 +446,7 @@ function TerminalSurface() {
               onReady={(value: WTerm) => {
                 if (term.current?.instance !== value) return
                 setReady(true)
+                setTerminalInstance(value)
                 launch.ready(value)
               }}
               onResize={(cols: number, rows: number) => {
@@ -415,6 +455,7 @@ function TerminalSurface() {
               onData={(secretInput: string) => input(new TextEncoder().encode(secretInput))}
               onBinary={input}
               onError={() => {
+                setTerminalInstance(null)
                 launch.invalidate()
                 setReady(false)
                 failed()
