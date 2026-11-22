@@ -133,6 +133,9 @@ function TerminalSurface() {
   const shellChoiceRef = useRef(defaultShell)
   shellChoiceRef.current = defaultShell
   const detectedShells = useAction(Shells, {})
+  const shellAvailable = !!detectedShells.data?.shells.length &&
+    (defaultShell === 'system' ||
+      detectedShells.data.shells.some((shell) => shell.path === defaultShell))
   const [access, setAccess] = useState<Metadata>()
   const [core, setCore] = useState<GhosttyCore>()
   const [state, setState] = useState('Loading terminal…')
@@ -410,7 +413,7 @@ function TerminalSurface() {
             <Button
               size="sm"
               variant="outline"
-              disabled={!opened && (!ready || launching)}
+              disabled={!opened && (!ready || launching || !shellAvailable)}
               onClick={(event) => {
                 if (opened) stop()
                 else if (event.nativeEvent.isTrusted) launch.request()
@@ -425,7 +428,9 @@ function TerminalSurface() {
           )}
           {!opened && !error && (
             <div className="terminal-idle-hint" role="status">
-              New sessions open in the project directory · full OS access · 10-minute maximum
+              {!detectedShells.loading && !shellAvailable
+                ? 'No valid default shell selected · choose an installed shell above'
+                : 'New sessions open in the project directory · full OS access · 10-minute maximum'}
             </div>
           )}
           {core && (
