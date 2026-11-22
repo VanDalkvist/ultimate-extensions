@@ -31,6 +31,7 @@ User explicitly requested fixing Usage, Skyscraper, Terminal together via the fu
 - [ ] Slice 1 Usage: add pure functional test for navigating status click to Agent then right panel, and a deployment-manifest test for all relative Usage web imports. Fix `web.solid.tsx`/installer as needed.
 - [ ] Slice 2 Terminal: add red/green unit tests for once-per-visit auto-start and reattachment without duplicated open; update `web.solid.tsx` wiring. Add red/green lifecycle test for `pagehide` detach and explicit Stop close.
 - [ ] Slice 3 Skyscraper: test discovery and install as read-only dry-run over fake dirs (including project override, symlinks and obsolete `web.tsx`); safely update its own repository's installer only. Avoid touching the game server.
+- [ ] Slice 3B Terminal deployment: add backup-preserving sync for the *installed* Terminal Solid/TS source files without replacing native `node_modules` or any session data; test a fake installed copy. Otherwise a GitHub fix still runs stale code locally.
 - [ ] S9 Architectural circuit: source diff, all relative imports in changed facets, server auth/PTY lifecycle invariants, no React fallback or stray server privilege changes.
 - [ ] S9 Product circuit: behavioral tests for status → panel, Terminal enter/remount/reload/stop, Skyscraper active facet detected; document **real installed macOS UI/PTY runs as NOT RUN** unless executed.
 - [ ] S10/S11 append markdown ledger and lessons after implementation; add install/restart acceptance commands; no auto GitHub Actions.
