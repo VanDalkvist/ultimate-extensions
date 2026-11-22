@@ -1,4 +1,4 @@
-import { ActionError } from '@/sdk'
+import { ActionError } from '@/sdk/solid'
 import { readLongpollMs } from './refs.ts'
 
 export async function readWithRetry<T>(read: () => Promise<T>, signal: AbortSignal) {

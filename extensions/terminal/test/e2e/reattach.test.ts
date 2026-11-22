@@ -29,7 +29,7 @@ test('a detached manual PTY survives the 30-second lease and replays executed ou
     device: { login: 'reattach-test', address: 'local' },
     signal: new AbortController().signal,
   }
-  const opened = await actions.open({ cols: 80, rows: 24 }, ctx) as {
+  const opened = await actions.open({ cols: 80, rows: 24, shell: '/bin/bash' }, ctx) as {
     pid: number
     secretToken: string
     sessionId: string

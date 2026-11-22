@@ -1,6 +1,6 @@
-import { ActionError } from '@/sdk'
+import { ActionError } from '@/sdk/solid'
 import { afterEach, expect, test, vi } from 'vitest'
-import { readWithRetry } from '../../read-retry.tsx'
+import { readWithRetry } from '../../read-retry.ts'
 import { readLongpollMs } from '../../refs.ts'
 
 const transportLost = new ActionError('terminal', 'read', 0, 'synthetic fetch failure')

@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest'
-import { terminalViewLifecycle } from '../../lifecycle.tsx'
+import { terminalViewLifecycle } from '../../lifecycle.ts'
 
 test.each([
   ['agent', 'failed', false],
