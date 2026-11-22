@@ -65,7 +65,7 @@ export function TerminalAgentSelection({
 
   async function send() {
     if (!preview || inFlight.current || deliveryUncertain) return
-    let prepared: ReturnType<typeof terminalAgentSubmission<ConversationId>>
+    let prepared: { message: string; conversation: ConversationId }
     try {
       prepared = terminalAgentSubmission(preview, conversation)
     } catch (error) {
