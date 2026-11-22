@@ -7,12 +7,24 @@ source_dir="$repo/extensions/subscription-usage"
 destination="$HOME/.ultimate/extensions/subscription-usage"
 stamp="$(date '+%Y%m%d-%H%M%S')"
 
-for filename in README.md web.solid.tsx server.ts cache.ts providers.ts types.ts lifecycle.ts; do
+# Discover and sync ALL top-level source dependencies, including navigation.ts.
+# A hand-maintained shortlist previously omitted a newly imported file and
+# made the installed Solid facet fail despite a successful GitHub merge.
+files=(README.md)
+for from in "$source_dir"/*.ts "$source_dir"/*.solid.tsx; do
+  [[ -f "$from" ]] || continue
+  files+=("${from##*/}")
+done
+for filename in "${files[@]}"; do
   if [[ ! -f "$source_dir/$filename" ]]; then
     echo "[error] Missing source file $source_dir/$filename" >&2
     exit 1
   fi
 done
+if [[ ! -f "$source_dir/web.solid.tsx" || ! -f "$source_dir/server.ts" ]]; then
+  echo "[error] Required Usage facets missing in $source_dir" >&2
+  exit 1
+fi
 
 if [[ -L "$destination" ]]; then
   resolved="$(cd "$destination" && pwd -P)"
@@ -25,7 +37,7 @@ if [[ -L "$destination" ]]; then
   echo "[ok] Already linked to current repository"
 else
   mkdir -p "$destination"
-  for filename in README.md web.solid.tsx server.ts cache.ts providers.ts types.ts lifecycle.ts; do
+  for filename in "${files[@]}"; do
     from="$source_dir/$filename"
     to="$destination/$filename"
     if [[ -L "$to" ]]; then
@@ -51,7 +63,7 @@ if [[ -f "$legacy" ]]; then
   echo "[backup] Disabled obsolete React web.tsx"
 fi
 
-if [[ ! -f "$destination/web.solid.tsx" || ! -f "$destination/lifecycle.ts" || -f "$destination/web.tsx" ]]; then
+if [[ ! -f "$destination/web.solid.tsx" || ! -f "$destination/lifecycle.ts" || ! -f "$destination/navigation.ts" || -f "$destination/web.tsx" ]]; then
   echo "[error] Installed state did not pass validation." >&2
   exit 1
 fi
