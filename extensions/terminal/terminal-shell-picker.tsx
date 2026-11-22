@@ -55,7 +55,6 @@ export function TerminalShellPicker({
         size="sm"
         variant="ghost"
         disabled={!catalog || !catalog.shells.length}
-        aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Choose default terminal shell"
         title={runningShell
@@ -68,13 +67,12 @@ export function TerminalShellPicker({
         <ChevronDownIcon className="size-3.5 text-muted-foreground" />
       </Button>
       {open && catalog && (
-        <div className="terminal-shell-menu" role="menu" aria-label="Default shell">
+        <div className="terminal-shell-menu" role="group" aria-label="Default shell">
           <div className="terminal-shell-menu-title">New sessions open with</div>
           <button
             type="button"
             className="terminal-shell-option"
-            role="menuitemradio"
-            aria-checked={value === 'system'}
+            aria-pressed={value === 'system'}
             onClick={() => select('system')}
           >
             <span>
@@ -88,8 +86,7 @@ export function TerminalShellPicker({
               type="button"
               className="terminal-shell-option"
               key={option.path}
-              role="menuitemradio"
-              aria-checked={value === option.path}
+              aria-pressed={value === option.path}
               onClick={() => select(option.path)}
             >
               <span>
@@ -101,7 +98,7 @@ export function TerminalShellPicker({
           ))}
           {!available && <p className="terminal-shell-menu-hint">Chosen shell is unavailable. Pick another.</p>}
           <p className="terminal-shell-menu-hint">
-            Saved in Ultimate · applies to the next shell · never changes your macOS/Linux login shell
+            Saved in this browser · applies to the next shell · never changes your OS login shell
           </p>
         </div>
       )}
