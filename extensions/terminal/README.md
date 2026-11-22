@@ -1,9 +1,26 @@
-A bounded macOS and Linux terminal in the browser: one host PTY, started explicitly, with the shell's bounds stated where you start it.
+A bounded macOS and Linux terminal in the browser: one host PTY, explicitly started, with a discoverable choice of installed shells.
 
 **Open shell** in the title bar hands one trusted click to the committed Terminal surface; the Terminal tab, the phone
 menu, the palette, tool cards and a restored view only navigate. **Start shell** in the view always starts one.
 
 ![Terminal: one shell, explicit start, its bounds in the header](../../docs/terminal.png)
+
+## Shell choice (macOS and Linux)
+
+The Shell dropdown discovers **installed** Zsh, Bash and Fish from `/etc/shells`, the login-shell environment and conventional system/Homebrew paths. A shell is offered only when its executable is present; it never installs packages or calls `chsh`.
+
+- **System default** picks your configured login `$SHELL` when verified, falling back to Zsh on macOS or Bash on Linux, if available.
+- Choose `/bin/zsh`, `/opt/homebrew/bin/zsh`, Bash or Fish to save that executable as the **Ultimate terminal default**. It persists via Ultimate's extension UI state across reloads/tabs, for user-started and approved agent-owned shells.
+- Selecting another shell never stops a running PTY. The selection applies when the next shell starts. The server re-discovers and validates the executable before every launch, not merely when displaying the menu.
+- Shells launch in login + interactive mode (`-l -i`) to load normal prompt, completion and user configuration. Your own startup scripts may enable history or run commands; this is a real OS shell, **not a sandbox**.
+- If `chsh` says “no changes made” on macOS yet this Terminal still shows `bash-3.2A bounded macOS and Linux terminal in the browser: one host PTY, started explicitly, with the shell's bounds stated where you start it.
+
+**Open shell** in the title bar hands one trusted click to the committed Terminal surface; the Terminal tab, the phone
+menu, the palette, tool cards and a restored view only navigate. **Start shell** in the view always starts one.
+
+![Terminal: one shell, explicit start, its bounds in the header](../../docs/terminal.png)
+
+, the old extension's hardcoded Bash was the cause. The picker removes that hardcoded launch.
 
 ## Find and share with the agent
 
