@@ -7,6 +7,7 @@ function probe(options: {
   loginShell?: string
   shellsFile?: string
   executablePaths?: string[]
+  identity?: (path: string) => string
 } = {}) {
   const executable = new Set(options.executablePaths ?? ['/bin/bash', '/bin/zsh'])
   return {
@@ -14,6 +15,7 @@ function probe(options: {
     loginShell: options.loginShell,
     shellsFile: options.shellsFile ?? '/bin/zsh\n/bin/bash\n/bin/sh',
     executable: (path: string) => executable.has(path),
+    identity: options.identity,
   }
 }
 
@@ -65,4 +67,16 @@ test('missing executable shells cause a safe denial, not a fallback to unvalidat
   assert.deepEqual(catalog.shells, [])
   assert.equal(catalog.systemDefault, '')
   assert.throws(() => shellForStart('system', catalog), /unavailable/)
+})
+
+test('do not show both aliases for the same physical bash executable', () => {
+  const catalog = detectShells(probe({
+    platform: 'linux',
+    loginShell: '/bin/bash',
+    shellsFile: '/bin/bash\n/usr/bin/bash',
+    executablePaths: ['/bin/bash', '/usr/bin/bash'],
+    identity: path => path === '/bin/bash' ? '/usr/bin/bash' : path,
+  }))
+  assert.deepEqual(catalog.shells.map(item => item.path), ['/bin/bash'])
+  assert.equal(catalog.systemDefault, '/bin/bash')
 })
