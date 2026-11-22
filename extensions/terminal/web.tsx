@@ -28,7 +28,7 @@ import { Tool, ToolHeader, ToolContent, ToolOutput } from '@/components/ai/tool'
 import { terminalViewLifecycle } from './lifecycle.tsx'
 import { readWithRetry } from './read-retry.tsx'
 import { shellLaunch, shellOpenIntent } from './shell-launch.tsx'
-import { TerminalFind, type TerminalSearchState } from './terminal-find.tsx'
+import { TerminalFind } from './terminal-find.tsx'
 import { TerminalAgentSelection } from './terminal-agent-selection.tsx'
 import './web.css'
 
@@ -135,12 +135,6 @@ function TerminalSurface() {
   const [ready, setReady] = useState(false)
   const [launching, setLaunching] = useState(false)
   const [terminalInstance, setTerminalInstance] = useState<WTerm | null>(null)
-  const [searchResult, setSearchResult] = useState<TerminalSearchState>({
-    count: 0,
-    activeIndex: -1,
-    searching: false,
-    limited: false,
-  })
 
   const [{ stop, leave, pagehide, failed }] = useState(() =>
     terminalViewLifecycle({
@@ -344,7 +338,7 @@ function TerminalSurface() {
                 Full OS access · Bash · 10-minute maximum · Stop ends the shell
               </p>
             </div>
-            <TerminalFind instance={terminalInstance} result={searchResult} />
+            <TerminalFind instance={terminalInstance} />
             <TerminalAgentSelection instance={terminalInstance} conversation={conversation} />
             {opened && (
               <Button
@@ -432,7 +426,6 @@ function TerminalSurface() {
               }}
               onData={(secretInput: string) => input(new TextEncoder().encode(secretInput))}
               onBinary={input}
-              onSearchChange={(value: TerminalSearchState) => setSearchResult(value)}
               onError={() => {
                 setTerminalInstance(null)
                 launch.invalidate()
