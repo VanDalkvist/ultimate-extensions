@@ -1,0 +1,62 @@
+import { useEffect, useState } from 'react'
+
+export const shellPreferenceKey = 'ultimate.terminal.default-shell.v1'
+const changedEvent = 'ultimate:terminal:default-shell-changed'
+
+type Store = Pick<Storage, 'getItem' | 'setItem'>
+
+export function readShellPreference(storage?: Pick<Storage, 'getItem'>): string {
+  try {
+    const chosen = storage?.getItem(shellPreferenceKey)
+    return chosen && (chosen === 'system' || (chosen.startsWith('/') && chosen.length <= 4096))
+      ? chosen
+      : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
+export function writeShellPreference(choice: string, storage: Store) {
+  if (choice !== 'system' && (!choice.startsWith('/') || choice.length > 4096))
+    throw new Error('Invalid terminal shell preference')
+  storage.setItem(shellPreferenceKey, choice)
+}
+
+/**
+ * Only a shell path is persisted (no terminal output, tokens or session data).
+ * React Ultimate installations do not consistently expose Solid's
+ * useExtensionUiState hook; localStorage works across reloads/browser tabs.
+ * The server always revalidates this untrusted preference before spawning.
+ */
+export function useTerminalShellPreference(): [string, (value: string) => void] {
+  const [choice, setChoice] = useState(() =>
+    typeof window === 'undefined' ? 'system' : readShellPreference(window.localStorage),
+  )
+
+  useEffect(() => {
+    function refresh() {
+      setChoice(readShellPreference(window.localStorage))
+    }
+    function onStorage(event: StorageEvent) {
+      if (event.key === shellPreferenceKey || event.key === null) refresh()
+    }
+    window.addEventListener('storage', onStorage)
+    window.addEventListener(changedEvent, refresh)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener(changedEvent, refresh)
+    }
+  }, [])
+
+  function update(value: string) {
+    if (value !== 'system' && (!value.startsWith('/') || value.length > 4096)) return
+    setChoice(value)
+    try {
+      writeShellPreference(value, window.localStorage)
+      window.dispatchEvent(new Event(changedEvent))
+    } catch {
+      // Private browsing may deny storage; current UI selection still works.
+    }
+  }
+  return [choice, update]
+}
