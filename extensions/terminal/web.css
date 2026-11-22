@@ -1,3 +1,8 @@
+.terminal-summary {
+  flex: 1 1 14rem;
+}
+
+/* The host may have a narrow panel inside a wide browser window. */
 /* #47345: project-only responsive utilities are not emitted by the host scanner. */
 @media (width < 40rem) {
   .terminal-toolbar {
