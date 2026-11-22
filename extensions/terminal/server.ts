@@ -24,6 +24,7 @@ type Session = {
   login?: string
   address?: string
   buffer: Buffer
+  history: Buffer
   base: number
   sent: number
   input: number
@@ -35,6 +36,14 @@ type Session = {
   lease: number
   deadline: number
 }
+const historyLimit = 128 * 1024
+function expired(s: Session) {
+  const now = Date.now()
+  // Manual shells survive a hidden view, but not the absolute deadline.
+  // Agent-owned shells keep the shorter renewable lease.
+  return now >= s.deadline || (s.owner === 'agent' && now >= s.lease)
+}
+
 let session: Session | undefined
 let pending: { id: string; conversation: number; expires: number } | undefined
 function revoke(s: Session) {
@@ -79,7 +88,7 @@ function terminate(s: Session, leaderExited = false) {
 export default function (host: { projectRoot: string; onClose(fn: () => Promise<void>): void }) {
   const expiry = setInterval(() => {
     if (session?.grant && Date.now() >= session.grant.expires) revoke(session)
-    if (session && (Date.now() > session.lease || Date.now() > session.deadline)) terminate(session)
+    if (session && expired(session)) terminate(session)
   }, 1000).unref()
   host.onClose(async () => {
     clearInterval(expiry)
@@ -146,10 +155,15 @@ function authorized(args: Record<string, JsonValue>, ctx: Context) {
     s.address !== ctx.device?.address
   )
     throw fail()
-  if (Date.now() > s.lease || Date.now() > s.deadline) terminate(s)
+  if (expired(s)) terminate(s)
   return s
 }
 function acknowledge(s: Session, cursor: number) {
+  // Replay acknowledged output in a new viewport without retaining an
+  // unbounded transcript or interfering with flow control.
+  s.history = Buffer.concat([s.history, s.buffer.subarray(0, cursor - s.base)]).subarray(
+    -historyLimit,
+  )
   s.buffer = s.buffer.subarray(cursor - s.base)
   s.base = cursor
   if (s.paused && s.buffer.length <= 64 * 1024 && !s.ended) {
@@ -205,7 +219,7 @@ function nativeTerminal(args: NativeArgs, conversation: number, cwd: string): Na
     (args.sessionId !== s.id || args.generation !== s.grant.generation)
   )
     throw fail()
-  if (Date.now() >= s.lease || Date.now() >= s.deadline) {
+  if (expired(s)) {
     terminate(s)
     throw fail()
   }
@@ -277,6 +291,7 @@ export const actions = {
       login: ctx.device?.login,
       address: ctx.device?.address,
       buffer: Buffer.alloc(0),
+      history: Buffer.alloc(0),
       base: 0,
       sent: 0,
       input: 0,
@@ -328,7 +343,14 @@ export const actions = {
     const s = authorized(args, ctx)
     const cursor = integer(args.cursor, s.base, s.sent)
     if (args.ack !== undefined && args.ack !== true) throw fail()
-    if (s.reading || ctx.signal.aborted) throw fail()
+    if (ctx.signal.aborted) throw fail()
+    if (s.reading) {
+      // The previous view may have a pending long-poll; let it finish
+      // before the newly mounted view becomes the sole reader.
+      s.wake?.()
+      await Promise.resolve()
+      if (s.reading) throw fail()
+    }
     s.reading = true
     try {
       if (args.ack && cursor > s.base) acknowledge(s, cursor)
@@ -414,10 +436,14 @@ export const actions = {
   }),
   inspect: guarded((_args, ctx) => {
     const s = session
+    if (s && expired(s)) terminate(s)
     if (!s || s.ended || s.login !== ctx.device?.login || s.address !== ctx.device?.address)
       return null
+    // Wake a long-poll left behind by the previous viewport.
+    s.wake?.()
     return {
       secretToken: s.secretToken,
+      secretReplay: s.history.toString('base64'),
       pid: s.pty.pid,
       cwd: ctx.host.projectRoot,
       cols: s.pty.cols,

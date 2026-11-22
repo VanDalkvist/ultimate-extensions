@@ -69,12 +69,11 @@ export function shellLaunch<Term extends Dimensions, Session extends Shell>(opti
       if (!current()) return
       const start = requested
       requested = false
-      if (existing?.owner === 'agent') {
+      if (existing) {
+        // The server owns the PTY; navigation only replaces the viewport.
         options.attach(existing, ready, true)
       } else if (!start) {
         options.changed('Ready · start a shell explicitly')
-      } else if (existing) {
-        options.changed('A shell is already active in another view', true)
       } else {
         phase = 'open'
         options.changed('Starting shell…')

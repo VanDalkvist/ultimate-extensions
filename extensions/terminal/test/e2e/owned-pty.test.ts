@@ -74,7 +74,9 @@ for (const mode of ['close', 'expiry'] as const) {
     if (mode === 'close') {
       await actions.close({ secretToken }, ctx)
     } else {
-      const expiry = Date.now() + 31_000
+      // User-owned PTYs now survive a 30-second gap; only the absolute
+      // ten-minute deadline expires them while their surface is hidden.
+      const expiry = Date.now() + 601_000
       t.mock.method(Date, 'now', () => expiry)
       // Do not invoke another action: the ordinary expiry interval must clean up.
     }
