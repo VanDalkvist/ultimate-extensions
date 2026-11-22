@@ -9,8 +9,7 @@ that Ultimate discovers; no fork of the core, no patched upstream.
 | [Files](extensions/files)                       | Browse and edit the project's files, with a Markdown preview          |
 | [Terminal](extensions/terminal)                 | A bounded macOS and Linux terminal in the browser, started explicitly           |
 | [Subscription usage](extensions/subscription-usage) | Provider quota in the status line                                 |
-| [VPN](extensions/vpn)                           | WireGuard tunnel status and settings in a panel                     |
-| [VPN](extensions/vpn) | Manual controls for an existing Mihomo daemon, Dashboard and settings |
+| [Mihomo VPN](extensions/vpn) | Control an existing Mihomo proxy: choose a server, check latency, open Dashboard and settings |
 
 These are the **Solid** versions: each browser facet is `web.solid.tsx`, so no React compatibility layer is needed.
 Written against Ultimate's extension API as of the `339e593` tree (22 November 2026): `solid-js` 2.0.3, `@ui-sdk/core` and
@@ -32,7 +31,7 @@ cp -r extensions/<name> <project>/.ultimate/extensions/
 
 If that destination already exists (including a dangling symlink), inspect it first; do not overwrite it. Ultimate discovers the personal extension and rebuilds the web bundle; no server restart is needed. To uninstall, disable it in Ultimate or remove only the symlink you created.
 
-[Terminal](extensions/terminal) needs `npm ci` inside its folder afterwards and a required macOS source build; follow its README using the host's Node. [VPN](extensions/vpn) requires `git submodule update --init --recursive` and has its own safe installer/readiness check; initialize its dependency before copying it. VPN targets the newer native Solid 2 facet API. [Files](extensions/files) needs `pnpm install --frozen-lockfile` inside its folder for the editor and preview. The remaining extensions have no dependency installation.
+[Terminal](extensions/terminal) needs `npm ci` inside its folder afterwards and a required macOS source build; follow its README using the host's Node. [Mihomo VPN](extensions/vpn) requires `git submodule update --init --recursive` and has its own safe installer/readiness check; initialize its dependency before copying it. Mihomo VPN targets the native Solid 2 facet API; it does not manage WireGuard tunnels. [Files](extensions/files) needs `pnpm install --frozen-lockfile` inside its folder for the editor and preview. The remaining extensions have no dependency installation.
 
 ## Screenshots
 
