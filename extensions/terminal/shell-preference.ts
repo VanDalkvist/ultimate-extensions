@@ -1,26 +1,13 @@
 import { useEffect, useState } from 'react'
 
-export const shellPreferenceKey = 'ultimate.terminal.default-shell.v1'
+import {
+  shellPreferenceKey,
+  readShellPreference,
+  validShellPreference,
+  writeShellPreference,
+} from './shell-preference-store.ts'
+
 const changedEvent = 'ultimate:terminal:default-shell-changed'
-
-type Store = Pick<Storage, 'getItem' | 'setItem'>
-
-export function readShellPreference(storage?: Pick<Storage, 'getItem'>): string {
-  try {
-    const chosen = storage?.getItem(shellPreferenceKey)
-    return chosen && (chosen === 'system' || (chosen.startsWith('/') && chosen.length <= 4096))
-      ? chosen
-      : 'system'
-  } catch {
-    return 'system'
-  }
-}
-
-export function writeShellPreference(choice: string, storage: Store) {
-  if (choice !== 'system' && (!choice.startsWith('/') || choice.length > 4096))
-    throw new Error('Invalid terminal shell preference')
-  storage.setItem(shellPreferenceKey, choice)
-}
 
 /**
  * Only a shell path is persisted (no terminal output, tokens or session data).
@@ -52,7 +39,7 @@ export function useTerminalShellPreference(): [string, (value: string) => void] 
   }, [])
 
   function update(value: string) {
-    if (value !== 'system' && (!value.startsWith('/') || value.length > 4096)) return
+    if (!validShellPreference(value)) return
     setChoice(value)
     try {
       writeShellPreference(value, window.localStorage)
