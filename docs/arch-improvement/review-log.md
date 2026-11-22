@@ -301,3 +301,46 @@
 **Verification:** 2/2 Node v22 tests exercising repeated open/dispose cycles and removal of `onRelease` pass. Both tested file Git blob SHA values match source on `main`. Current host API checked against upstream server lifecycle and startup implementation. Actual Ultimate macOS core restart, provider HTTP reads and live status-line UI **NOT RUN** from this environment.
 
 **Disposition:** fixed in main, local install script supplied. If the warning survives installed file sync, inspect earlier facet load failures (the update auto-restart warning is downstream) rather than treating it as a Usage quota/credential problem.
+
+
+## Cycle 7 — 2026-11-22 — Terminal entry, Usage pane and discovery-aware installation
+
+### S0/S1/S2 Context
+- User evidence: Usage status indicator visible but its panel does not open; Skyscraper still shows Ultimate 0.1 React facet error despite Solid in its separate repository; Terminal requires pressing Start again and user suspects shell sessions are reset.
+- Repo is `VanDalkvist/ultimate-extensions`; Skyscraper changes remain **only** in `VanDalkvist/bb-plugin-skyscraper`.
+- Prior lessons: React/Solid web and server SDK must match installed Ultimate; do not confuse a GitHub merge with installed extension updates; distinguish user-held capabilities from view lifetime; reattachment must retain exclusive read/ack semantics. Canonical orchestration: `arch-improvement-loop/SKILL.md`.
+- Host context: `lib/discovery.ts` discovers builtin → user → project with last name winning; `webFacet` prefers `web.solid.tsx` over React **within one directory**. `openPanel(id)` only changes panel state; `Panels` mounts on the Agent surface, not Terminal/Files.
+
+### S3–S5 Approved design / ranked findings
+1. **P1 fixed — Usage indicator action invisible on Terminal/Files.** Clicking a global status item cannot assume the current surface mounts `Panels`. Use native `StatusButton` inside `TooltipTrigger`, and route through `showSurface('agent')` then `openPanel('subscription-usage')`. Command-palette action uses the same helper.
+2. **P1 fixed — Usage installed copy missing imported `navigation.ts` / project overrides.** Installer used a stale manual filename list and only wrote user-level extension, while a project-level copy could shadow it. Installer now synchronizes all top-level `.ts` + `.solid.tsx` with backups, validates both user and present project directories, checks unexpected symlinks, leaves SQLite/auth untouched.
+3. **P1 fixed — Terminal cold visit requires separate Start.** `autoStartOnVisit` requests launch only once per mounted Terminal view and only after WTerm is ready and selected shell exists. Existing `shellLaunch` always inspects for an active PTY first, avoiding duplicate processes. Agent-owned shells still require approval.
+4. **P1 fixed — Terminal browser pagehide was killing user PTY.** View now aborts its reader and detaches; existing server deadline remains 10 minutes absolute. Explicit Stop still closes. Browser refresh can reattach if the core and PTY remain alive.
+5. **P1 fixed — BFCache and race on in-flight inspect/open.** `pageshow` re-inspects and preserves the return intent when the old `inspect` or `open` request is stale. An orphaned capability from a stale Open is closed exactly once. No write retries or speculative PTY creation.
+6. **P1 fixed in external repo — Skyscraper project override and hidden pane.** Its installer now reports actual builtin/user/project priority, repairs pre-existing project-level React copy with backups, preserves unrelated symlinks, and the header/palette navigates to Agent before opening its right panel. It remains a separate repo.
+7. **P1 fixed — BFCache replay duplicates existing output.** A restored browser retains the WTerm DOM, so blindly replaying `secretReplay` on `Inspect` appends old output twice. `terminal-replay.ts` now selects the last actually displayed cursor for the same session ID and skips replay; a new native session sends a terminal-only RIS reset before fresh output. Captures are in-memory, contain no bearer token and occur only after the emulator has initialized its screen.
+8. **P2 log-only — browser-dependent implementation validation.** Exact installed macOS root, browser Solid compilation, native node-pty and full-screen TUI are not accessible from connected GitHub.
+9. **P2 log-only — server lifetime.** Manual PTY still expires at 10 minutes absolute; an Ultimate core restart ends it, and fatal transport errors can terminate manual shells. Extending privileged resource lifetime is a separate decision.
+
+### S6–S8 Plan and work
+- Saved plan: `docs/superpowers/plans/2026-11-22-arch-improvement-cycle-7-terminal-usage-skyscraper.md`, written before Cycle 7 code changes.
+- Thin modules: `extensions/terminal/auto-start.ts`, `extensions/subscription-usage/navigation.ts` (created just before cycle), existing `shell-launch.ts`/ `lifecycle.ts` retained, not rewritten. Added native status trigger and consistent command navigation.
+- Deployment slice: `scripts/install-terminal.sh` preserves `node_modules/node-pty` and modified files; `scripts/install-subscription-usage.sh` preserves SQLite and user settings. Both respect existing project overrides and refuse untrusted symlinks. No GitHub Actions.
+- Separate Skyscraper changes are in `bb-plugin-skyscraper` (no duplicated code here).
+
+### S9 Actual evidence and dual circuits
+- **Architecture circuit: PASS for source invariants.** Inspected implementation code and host SDK: `@/sdk/solid` exports `showSurface/openPanel`, native `StatusButton` exists, `shellLaunch` still inspects before Open, closes stale Open capability, maintains single PTY and has no new privilege grant or persisted secret. No React facet reintroduced.
+- **Behavioral unit/smoke: 18/18 PASS on Node v22** in the current working environment:
+  - 7 pure behavior cases: Usage/Skyscraper panel action order, delayed once-only Terminal entry, pagehide vs explicit Stop, BFCache reattach, stale Inspect and stale Open races.
+  - 2 Skyscraper installer fixture cases (project-level React precedence, backup and unrelated symlink refusal).
+  - 3 Usage/Terminal installer fixture cases (all imported modules, native node-pty and local data preservation, project override).
+  - 6 replay-state tests from `test/terminal-replay.test.ts`: retained DOM cursor, new PTY reset, different session history, fresh mount, advanced server base, and pre-render pagehide safety. The actual committed pure source/test blob SHAs match the executed copies.
+  - Git blob SHA of tested production `auto-start.ts`, `lifecycle.ts`, `shell-launch.ts`, `errors.ts`, both navigation helpers, `terminal-replay.ts` and installer scripts matched the GitHub versions under review.
+- **Product circuit: BLOCKED / NOT RUN.** No actual Ultimate 0.1 Solid frontend build, native macOS node-pty test, renderer screenshot, project-root discovery in the user's running process, or live click/reattach observation. Source tests do **not** mean the installed app is verified. The user's earlier request authorized merging after final architecture review with disclosed runtime residuals.
+- Diff gate: compared `main..branch` paths; changes confined to Terminal/Usage UI, tests, safe installers and arch docs. Skyscraper remains in its own repository.
+
+### S10–S12 Lessons / next smoke
+- Global buttons must navigate to an actually mounted panel host, not merely change panel state; unit-test order and target, then verify a real click in the live UI.
+- Installer coverage is part of the runtime dependency graph. Every new relative import must reach the chosen *installed* extension folder, including project-scoped overrides that shadow the user copy.
+- A terminal renderer's lifetime is not a native PTY's lifetime. BFCache state changes need an explicit inspect/attach handshake and stale asynchronous requests must not start or leak duplicate PTYs.
+- After installing, verify Usage click from Terminal and Agent, Skyscraper header and palette, Terminal first visit→return→refresh/Stop, inspect PID and 10-minute expiry. If a live macOS/compiled result differs, return to S8 rather than claim success.

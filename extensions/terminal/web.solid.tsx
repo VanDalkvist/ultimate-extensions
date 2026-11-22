@@ -14,6 +14,8 @@ import {
   type SolidToolProps, type ToolCallView,
 } from '@/sdk/solid'
 import { settled } from './errors.ts'
+import { autoStartOnVisit } from './auto-start.ts'
+import { terminalResumePlan, captureRenderedSnapshot, type TerminalResumeSnapshot } from './terminal-replay.ts'
 import { readActionFailure } from './action-failure.ts'
 import { terminalViewLifecycle } from './lifecycle.ts'
 import { readWithRetry } from './read-retry.ts'
@@ -60,6 +62,8 @@ type Running = Opened & {
   queue: Promise<unknown>
   pending: number
   count: number
+  renderedCursor: number
+  screenInitialized: boolean
 }
 const closeShell = (secretToken: string) =>
   api.action(Close, { secretToken }, { keepalive: true })
@@ -109,6 +113,8 @@ function TerminalSurface() {
   const [changingGrant, setChangingGrant] = createSignal(false)
   const [terminalInstance, setTerminalInstance] = createSignal<WTerm | null>(null)
   let running: Running | null = null
+  // In-memory only: BFCache keeps the WTerm DOM but not its native read loop.
+  let retainedView: TerminalResumeSnapshot | null = null
   let mounted = false
   let grantInFlight = false
 
@@ -161,12 +167,16 @@ function TerminalSurface() {
     void settled(control({ secretInput: btoa(String.fromCharCode(...bytes)) }))
   }
   async function run(value: Opened, terminal: WTerm, existing: boolean) {
+    const replay = terminalResumePlan(value, retainedView, existing)
+    retainedView = null
     const session: Running = {
       ...value,
       abort: new AbortController(),
       queue: Promise.resolve(),
       pending: 0,
       count: 0,
+      renderedCursor: replay.cursor,
+      screenInitialized: false,
     }
     running = session
     try {
@@ -175,11 +185,13 @@ function TerminalSurface() {
       setOpened(value)
       setAccess(value)
       setState('Running')
-      if (existing && value.secretReplay) {
+      if (replay.resetOldScreen) terminal.write('\x1bc') // RIS to WTerm, never to PTY
+      if (replay.replayHistory && value.secretReplay) {
         terminal.write(Uint8Array.from(atob(value.secretReplay), (char) => char.charCodeAt(0)))
       }
       terminal.focus()
-      let cursor = value.cursor
+      session.screenInitialized = true
+      let cursor = replay.cursor
       while (running === session) {
         const result = await readWithRetry(
           () => api.action(
@@ -197,6 +209,7 @@ function TerminalSurface() {
         setAccess(result)
         terminal.write(Uint8Array.from(atob(result.secretOutput), (char) => char.charCodeAt(0)))
         cursor = result.cursor
+        session.renderedCursor = cursor
         if (result.ended) {
           leave()
           setState('Stopped')
@@ -228,13 +241,33 @@ function TerminalSurface() {
     attach: (value, terminal, existing) => void run(value, terminal, existing),
   })
 
+  // Entering the Terminal surface is the intentional Start. Inspect always
+  // wins over Open, so navigating back to an active PTY cannot spawn another.
+  // The guard is scoped to this mounted view: changing shell settings or
+  // finishing a read does not generate extra launch requests.
+  const autoStart = autoStartOnVisit(launch.request)
+  createEffect(
+    () => ({ ready: ready(), installed: shellAvailable() }),
+    ({ ready: terminalReady, installed }) => { autoStart(terminalReady, installed) },
+  )
+
   onSettled(() => {
     mounted = true
     launch.connect()
     const disconnectIntent = openIntent.connect(launch.request)
-    const hide = () => { launch.hide(); pagehide() }
+    const hide = () => {
+      retainedView = captureRenderedSnapshot(running)
+      launch.hide()
+      pagehide()
+    }
+    const restore = () => {
+      launch.show()
+      // BFCache restores an existing view without re-running its initial
+      // mount effect. Request once; shellLaunch will inspect before opening.
+      if (shellAvailable()) launch.request()
+    }
     window.addEventListener('pagehide', hide)
-    window.addEventListener('pageshow', launch.show)
+    window.addEventListener('pageshow', restore)
     let active = true
     let loaded: GhosttyCore | undefined
     void GhosttyCore.load({ wasmPath: wasmUrl, scrollbackLines: 1000, imageStorageLimit: 0 })
@@ -256,7 +289,7 @@ function TerminalSurface() {
       launch.disconnect()
       leave()
       window.removeEventListener('pagehide', hide)
-      window.removeEventListener('pageshow', launch.show)
+      window.removeEventListener('pageshow', restore)
       loaded?.dispose()
     }
   })

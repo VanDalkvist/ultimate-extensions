@@ -132,3 +132,58 @@ it('reattaches a manually started shell after the Terminal surface remounts', as
   expect(third.attach).toHaveBeenCalledOnce()
   expect(third.open).not.toHaveBeenCalled()
 })
+
+it('returns from browser pagehide to an existing PTY without starting a duplicate', async () => {
+  const view = surface()
+  view.inspect.mockResolvedValue(user)
+  view.launch.ready(terminal)
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(view.attach).toHaveBeenCalledOnce()
+  expect(view.open).not.toHaveBeenCalled()
+
+  // pagehide detaches the reader, but the native PTY remains alive.
+  view.stop()
+  view.launch.hide()
+  view.launch.show()
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(view.inspect).toHaveBeenCalledTimes(2)
+  expect(view.attach).toHaveBeenCalledTimes(2)
+  expect(view.open).not.toHaveBeenCalled()
+})
+
+it('restores an interrupted inspect after BFCache pageshow and consumes one user launch', async () => {
+  const view = surface()
+  const first = Promise.withResolvers<typeof user | null>()
+  view.inspect.mockReturnValueOnce(first.promise)
+  view.launch.ready(terminal)
+  view.launch.hide()
+  view.launch.show()
+  view.launch.request() // one deliberate entry; first inspect is obsolete
+  first.resolve(null)
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(view.inspect).toHaveBeenCalledTimes(2)
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(view.open).toHaveBeenCalledOnce()
+})
+
+it('preserves a user return while a stale Open is being closed after pagehide', async () => {
+  const view = surface()
+  const oldOpen = Promise.withResolvers<typeof user>()
+  view.open.mockReturnValueOnce(oldOpen.promise)
+  view.launch.ready(terminal)
+  view.launch.request()
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(view.open).toHaveBeenCalledOnce()
+
+  // The old opened capability becomes an orphan after browser pagehide.
+  view.launch.hide()
+  view.launch.show()
+  view.launch.request()
+  oldOpen.resolve(user)
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(view.close).toHaveBeenCalledOnce()
+  expect(view.open).toHaveBeenCalledTimes(2)
+  expect(view.attach).toHaveBeenCalledOnce()
+})

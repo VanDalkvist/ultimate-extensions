@@ -93,6 +93,12 @@ export function shellLaunch<Term extends Dimensions, Session extends Shell>(opti
     } finally {
       phase = 'idle'
       if (connected) options.busy(false)
+      // pagehide can supersede an inspect before it resolves. Once the
+      // original request drains, re-inspect the restored view instead of
+      // leaving a BFCache page with a disconnected terminal.
+      if (connected && !hidden && terminal && version !== epoch && !options.running()) {
+        void prepare()
+      }
     }
   }
 
@@ -117,8 +123,19 @@ export function shellLaunch<Term extends Dimensions, Session extends Shell>(opti
       void prepare()
     },
     request(this: void) {
-      if (!connected || hidden || options.running() || phase === 'open') return
-      if (phase === 'inspect' && inspectedEpoch !== epoch) return
+      if (!connected || hidden || options.running()) return
+      if (phase === 'open') {
+        // An old in-flight Open will be closed if its epoch was hidden.
+        // Preserve the fresh return intent so a new inspection follows it.
+        if (inspectedEpoch !== epoch) requested = true
+        return
+      }
+      if (phase === 'inspect' && inspectedEpoch !== epoch) {
+        // A request made after pageshow must survive the old inspect's
+        // cancellation; the finally block starts a fresh inspection.
+        requested = true
+        return
+      }
       requested = true
       void prepare()
     },
@@ -134,6 +151,7 @@ export function shellLaunch<Term extends Dimensions, Session extends Shell>(opti
     },
     show(this: void) {
       hidden = false
+      void prepare()
     },
   }
 }
