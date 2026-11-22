@@ -67,3 +67,10 @@
 - Migration requires old facet deletion, package/lock pruning, and updating pure \`.tsx\` helpers/tests to \`.ts\`; preserving imports by accident may compile only under an obsolete host.
 - Verification discipline: source-level architecture invariants and pure Node tests are **not** full Solid/PTY integration or proof of visual quality; do not claim black-box product PASS without launching the host.
 - Evidence: \`extensions/terminal/web.solid.tsx\`, \`terminal-emulator.solid.tsx\`, \`terminal-controls.solid.tsx\`, \`test/web\`, \`package-lock.json\`.
+
+
+## 2026-11-22 — Server extension lifetime changed: onRelease was removed
+- Symptom: status read failed and the updater printed `System is not ready` after Ultimate 0.1 migration.
+- Cause: the User Usage extension server called a removed host method `onRelease` during facet load. The updater's onLoadError early `host.system()` threw a secondary error.
+- Do next time: check *server* host lifecycle and *web* SDK compatibility together before a Solid migration. Register work within `host.onOpen(async scope => scope.defer(cleanup))`, and put process-wide resources in `host.resource` with process-level `onClose`.
+- Installation: a `git pull` does not replace files in a copied `~/.ultimate/extensions/` folder. Use a narrowly scoped backup-preserving sync, never remove SQLite or browser drafts as a workaround.
