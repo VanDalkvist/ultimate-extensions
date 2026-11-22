@@ -19,8 +19,9 @@ export interface Host {
   modelRuntime: Runtime
   resource<T>(key: string, create: () => T): T
   onClose(cleanup: () => Promise<void>): void
-  onRelease(cleanup: () => Promise<void>): void
-  onOpen(callback: () => Promise<void>): void
+  onOpen(callback: (opened: {
+    defer(cleanup: () => void | Promise<void>): void
+  }) => void | Promise<void>): void
 }
 
 interface LocalState {
@@ -222,9 +223,13 @@ export const actions = {
 
 export default function subscriptionUsage(host: Host) {
   const instance = tracker(host)
-  host.onOpen(async () => instance.open())
-  host.onRelease(() => instance.close())
-  host.onClose(() => instance.close())
+  // Current Ultimate has no onRelease(): each open gets a disposable scope.
+  // On a core swap, unload or restart, stop in-flight provider reads before
+  // the shared DB resource is closed by its process-level onClose callback.
+  host.onOpen(async (opened) => {
+    instance.open()
+    opened.defer(() => instance.close())
+  })
   return defineExtension({
     name: 'subscription-usage',
     hooks: [
