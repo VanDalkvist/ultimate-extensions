@@ -29,15 +29,6 @@ importers:
       '@tiptap/starter-kit':
         specifier: 3.35.0
         version: 3.35.0
-      react:
-        specifier: ^19.0.0
-        version: 19.3.1
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.3.1(react@19.3.1)
-      streamdown:
-        specifier: 2.7.0
-        version: 2.7.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
 
 packages:
 

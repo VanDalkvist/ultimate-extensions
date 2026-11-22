@@ -1,14 +1,13 @@
 import { Editor, Extension } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 import { Fragment, Slice } from '@tiptap/pm/model'
-import { useEffect, useRef, useState } from 'react'
 import {
   markdownDocument,
   markdownExtensions,
   markdownManager,
   previewReason,
   serializeMarkdown,
-} from './markdown-document.tsx'
+} from './markdown-document.ts'
 
 type MarkdownEditorProps = {
   path: string
@@ -139,51 +138,3 @@ export function createMarkdownEditor({
   }
 }
 
-export function MarkdownEditor({ path, value, onChange, editable = true }: MarkdownEditorProps) {
-  const [unsupported, setUnsupported] = useState<string>()
-  const root = useRef<HTMLDivElement>(null)
-  const session = useRef<ReturnType<typeof createMarkdownEditor> | null>(null)
-  const change = useRef(onChange)
-  change.current = onChange
-  const latest = useRef({ value, editable })
-  latest.current = { value, editable }
-
-  useEffect(() => {
-    if (!root.current) return undefined
-    setUnsupported(undefined)
-    const mounted = createMarkdownEditor({
-      element: root.current,
-      path,
-      ...latest.current,
-      onChange: (text) => change.current(text),
-      onUnsupported: setUnsupported,
-    })
-    session.current = mounted
-    return () => {
-      session.current = null
-      mounted.editor.destroy()
-    }
-  }, [path])
-
-  useEffect(() => {
-    session.current?.receive(value)
-  }, [value, path])
-
-  useEffect(() => {
-    session.current?.editor.setEditable(editable, false)
-  }, [editable, path])
-
-  return (
-    <div>
-      {unsupported && (
-        <p
-          role="alert"
-          className="mb-3 rounded-md border border-error/30 bg-error/5 p-3 text-[12px] text-error"
-        >
-          {unsupported}
-        </p>
-      )}
-      <div ref={root} data-files-markdown-editor />
-    </div>
-  )
-}

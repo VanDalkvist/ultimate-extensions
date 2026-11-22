@@ -264,3 +264,25 @@
 **S9 outcome: BLOCKED, NOT PASS.** The compiled Solid build, browser error-card disappearance, actual provider actions and macOS visual interaction are not executed here. Draft PR #7 awaits running host verification. No GitHub Actions added.
 
 **S10 learning:** Always inventory *all installed facets* and the actual host framework version before porting an individual component. Isolation by repo/extension is not a reason to put a product plugin into a shared tooling repository. Keep high-risk user-data migrations apart from low-risk panel upgrades.
+
+## Cycle 5B — 2026-11-22 — Files Solid 2, preserve drafts (Draft PR #8)
+
+**Source context:** Ultimate 0.1 rejects React `web.tsx`; user reported a real Files error card. Unlike Skyscraper (which remains exclusively in `VanDalkvist/bb-plugin-skyscraper`), Files belongs to `ultimate-extensions`. Current upstream `extensions/README.md`, `skills/solid-ui/SKILL.md`, `docs/extensions/actions.md` and SDK provide the contract.
+
+**S0–S3 map:** Solid surface → read-only directory `list` action → in-memory session/tab buffers → `read` and version-checked `save` native actions. Tiptap editor receives/sends Markdown through the existing lossless validator. Browser `sessionStorage` keeps drafts under the original `ultimate.files:<root>` key; file link bus is tab-local. File server and its allowlists must not change.
+
+**S4–S5 severity and decisions:**
+1. **P0 fixed at source level:** obsolete `web.tsx` deleted; exactly one `web.solid.tsx`, Solid tree/editor/preview and current `@/sdk/solid` UI kit.
+2. **P1 preserve:** do not replace version-aware autosave/conflict behavior. Existing `createSession` and `buffers` algorithms copied into plain TypeScript without changing write semantics; 700 ms debounce, pending requests, draft recovery, pause before discard and failed-write handling retained. Solid only subscribes to the existing observable store and reconciles a mount race.
+3. **P1 preserve:** Tiptap lossless core and frontmatter/BOM/Markdown semantics were moved without rewriting validation/paste/serialization; Solid component only owns DOM/editor mount/receive/destroy.
+4. **P1 safety:** unsupported Markdown preview no longer can use React Streamdown. Replaced it with a **non-interactive Solid AST renderer** that never creates `<a>`, `<img>`, `innerHTML` or executes raw HTML. Source mode remains authoritative. Formatting differs from Streamdown and needs human comparison.
+5. **P1 blocked:** a successful source transformation does not prove no draft loss. Actual host autosave/in-flight edits/conflict reload/recovery and Tiptap caret/IME must be tested before merging.
+6. **P2 partial:** package importer removed React, React DOM and Streamdown; orphaned pnpm snapshot entries remain (harmless if frozen lockfile accepts them; installer check pending).
+7. **P2 compatibility:** Solid 2 `useAction` accessors, durable `useExtensionUiState`, `onSettled`, `For`, `Show` and kit buttons now used; no direct React rendering inside Solid.
+8. **P3 deferred:** editor orchestration still shares a long `web.solid.tsx`; avoid speculative refactoring of sensitive dirty/save flow before browser acceptance.
+
+**S6–S8 execution:** copied `buffers.tsx → buffers.ts`, `markdown-document.tsx → markdown-document.ts`; split Tiptap to `markdown-editor.ts` plus `markdown-editor.solid.tsx`; Solid-only tree and inert preview; ported session subscription and UI commands; test imports preserved and SSR preview test rewritten for safe AST source; removed seven obsolete `.tsx` React files. Server `actions` unchanged.
+
+**S9 verification:** source inventory shows **one** `extensions/files/web.solid.tsx`, zero leftover non-Solid `.tsx` files in Files, no React-specific UI code in changed modules. Original pure-state tests retained and redirected to new paths. Full `pnpm install --frozen-lockfile`, TypeScript/OXC Solid compilation, Vitest, browser visual and real macOS editor/autosave/conflict/recovery **NOT RUN**. **S9 dual-circuit verdict BLOCKED — do not merge PR #8 solely on static checks.**
+
+**S10 lessons:** preserve user data/model and one-shot save protocols during a framework migration. Browser-generated state and editor focus cannot be validated with a file-naming check. Keep large high-risk changes isolated from unrelated panel upgrades and from independently maintained projects like Skyscraper.

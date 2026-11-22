@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Slice } from '@tiptap/pm/model'
-import { createMarkdownEditor } from '../../markdown-editor.tsx'
+import { createMarkdownEditor } from '../../markdown-editor.ts'
 import {
   markdownDocument,
   markdownManager,
   previewReason,
   serializeMarkdown,
-} from '../../markdown-document.tsx'
+} from '../../markdown-document.ts'
 
 const prefix = '\uFEFF---\r\ntitle: "Keep exactly"\r\ncustom: [one, two]\r\n---\r\n\r\n'
 const image = '![diagram](https://example.com/picture.png "A diagram")'

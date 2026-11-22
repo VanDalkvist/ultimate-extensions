@@ -1,12 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createSession } from '../../session.tsx'
-import { dirty } from '../../buffers.tsx'
+import { createSession } from '../../session.ts'
+import { dirty } from '../../buffers.ts'
 import type { FileResult, SaveResult } from '../../types.ts'
 
 const fake = vi.hoisted(() => ({
   action: vi.fn<(ref: { name: string }, args: unknown) => Promise<FileResult | SaveResult>>(),
 }))
-vi.mock('@/sdk', () => ({
+vi.mock('@/sdk/solid', () => ({
   actionRef: (extension: string, name: string) => ({ extension, name }),
   api: { action: fake.action },
   errorMessage: (error: unknown) => (error instanceof Error ? error.message : String(error)),

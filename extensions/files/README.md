@@ -35,3 +35,14 @@ pnpm install --frozen-lockfile
 
 If you link the extension instead of copying it, run the same install command in the linked Files folder. Files owns
 its editor and preview dependencies; nothing needs to be installed in Ultimate's checkout.
+
+## Ultimate 0.1 · Solid facet
+
+The Files UI is a native Solid 2 facet (`web.solid.tsx`); Ultimate 0.1 no longer loads React `web.tsx`.
+The **server read/save path, 700 ms debounce, conflict handling and sessionStorage draft key** have not changed.
+The existing lossless Tiptap engine remains in `markdown-editor.ts`; its DOM lifecycle now belongs to Solid.
+Unsupported Markdown is shown by an inert Solid read-only renderer, without image fetches, active links or HTML injection. Source remains the authoritative fallback for unsupported syntax.
+
+After installing this version, keep any unsaved work from the previous running Ultimate tab until you confirm the new version restores it. Do not delete the browser's stored drafts to fix an extension-loading error.
+
+Migration is not complete until the compiled Solid UI and autosave/recovery journeys are exercised on the installed Ultimate runtime.
