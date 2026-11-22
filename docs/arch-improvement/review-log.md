@@ -344,3 +344,27 @@
 - Installer coverage is part of the runtime dependency graph. Every new relative import must reach the chosen *installed* extension folder, including project-scoped overrides that shadow the user copy.
 - A terminal renderer's lifetime is not a native PTY's lifetime. BFCache state changes need an explicit inspect/attach handshake and stale asynchronous requests must not start or leak duplicate PTYs.
 - After installing, verify Usage click from Terminal and Agent, Skyscraper header and palette, Terminal first visit→return→refresh/Stop, inspect PID and 10-minute expiry. If a live macOS/compiled result differs, return to S8 rather than claim success.
+
+
+## Cycle 8 — 2026-11-22 — Regression after Solid snapshot sync
+
+### S0–S7
+Plan: `docs/superpowers/plans/2026-11-22-arch-improvement-cycle-8-post-solid-regression.md`. Main baseline `f6546e9`, prior validated source `614200b`. Loaded prior memory and Cycle 7 post-merge review. User requested continuation of the repair. Skyscraper remains in `VanDalkvist/bb-plugin-skyscraper`; its game Draft PR #1 is out of scope.
+
+**P1: post-merge destructive overwrite.** Commit `f6546e9` changed both terminal and usage to a simplified Solid snapshot, removing Cycle 7 behavior and tests. On the actual `f6546e9` blobs, seven targeted probes all failed: removed `onRelease` API was reintroduced, Usage panel navigation lost, terminal auto-start and BFCache replay removed, native shell discovery removed, pagehide detach file missing, Usage open-scope module missing. Install scripts retained preexisting required filenames that no longer existed in the source, so they would fail their own preflight. This is source-proven, not a speculative Mac issue.
+
+### S8 implementation
+- Restored `extensions/terminal/**` and `extensions/subscription-usage/**` **blob-identically** to already-merged, behaviorally tested `614200b` (48 previous files; 53 tree operations including replacing simplified files and removing incompatible new-only variants).
+- Left `extensions/files/**`, right-panel-resize, VPN, root README, and Skyscraper untouched. Kept native-PTY/session and Usage SQLite installation safety.
+- Added `test/arch-loop-regressions.test.mjs`: optional, local Node source admission gate, intended command `node --test test/arch-loop-regressions.test.mjs`. It checks missing imports, lifecycle, navigation, Terminal auto-start, BFCache, shell discovery, installer prerequisites and no React fallback. No automated GitHub Action.
+
+### S9 verification and honest boundaries
+- **RED observed:** 0/7 core source contracts on `f6546e9` before repair.
+- **GREEN observed:** 7/7 those contracts on `614200b`; 8/8 source contracts on repaired branch `c19b200` by fetching and inspecting its actual GitHub source/blob tree. Exact file-level restoration uses original git object SHAs, not manually reproduced snapshots.
+- The old Cycle 7 behavior-suite result was **18/18 Node 22 PASS** at the time of that prior PR, per its ledger. It was **not rerun** in this continuation. New local source contract test syntax was checked with Node 22 in an isolated working file, but its full `node --test` run against this remote repository was **not performed** here. Do not upgrade these to a new live test result.
+- **Architecture circuit:** source-only result PASS for restoring the known-good contracts, retaining imports, avoiding new server privileges and preserving unrelated changes. Verification still requires full compiled SDK compatibility.
+- **Product circuit: BLOCKED.** This environment cannot run the user's local macOS Ultimate build, real node-pty, installed user/project overrides, status panel or Ghostty rendering. The live dual-circuit Arch Loop gate is **not PASS**. Previous user authorization permitted merge with that risk explicitly noted.
+- **Known limits unchanged:** session absolute 10-minute deadline; restarting the Ultimate core process terminates its PTY. Source checkout update does not replace project/user installed extension copies: run both backup-preserving installer scripts from the actual Ultimate project root; check Skyscraper separately in its own repo.
+
+### S10–S11 learning
+An upstream synchronization can silently roll back already merged product behavior when it overwrites entire extension directories and deletes tests. Treat a source-to-source sync as a *migration with a manifest of protected contracts*. Gate on both behavioral tests and installed-host verification, and verify installer prerequisites still exist before declaring a release. Do not bury product test unavailability behind source PASS.
