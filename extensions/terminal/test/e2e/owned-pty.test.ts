@@ -42,7 +42,7 @@ for (const mode of ['close', 'expiry'] as const) {
       device: { login: 'pty-test', address: 'local' },
       signal: AbortSignal.timeout(6000),
     }
-    const { pid, secretToken } = await actions.open({ cols: 80, rows: 24 }, ctx) as {
+    const { pid, secretToken } = await actions.open({ cols: 80, rows: 24, shell: '/bin/bash' }, ctx) as {
       pid: number
       secretToken: string
     }
