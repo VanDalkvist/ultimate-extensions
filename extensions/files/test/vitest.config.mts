@@ -6,7 +6,7 @@ const host = process.cwd()
 
 export default {
   resolve: {
-    alias: { '@/sdk': join(host, 'web/src/compat/sdk.ts'), '@ultimate': host },
+    alias: { '@/sdk/solid': join(host, 'web/src/sdk/solid.ts'), '@ultimate': host },
     dedupe: ['vitest', '@earendil-works/pi-durable'],
   },
   oxc: { jsx: { runtime: 'automatic' } },
