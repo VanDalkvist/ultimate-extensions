@@ -14,17 +14,28 @@ export type TerminalSearchState = {
  * Uses wterm's built-in retained-buffer search. Do not install xterm.js addons:
  * this terminal is WTerm + Ghostty, not an xterm.js instance.
  */
-export function TerminalFind({
-  instance,
-  result,
-}: {
-  instance: WTerm | null
-  result: TerminalSearchState
-}) {
+export function TerminalFind({ instance }: { instance: WTerm | null }) {
+  const [result, setResult] = useState<TerminalSearchState>({
+    count: 0,
+    activeIndex: -1,
+    searching: false,
+    limited: false,
+  })
   const [visible, setVisible] = useState(false)
   const [query, setQuery] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(false)
   const input = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!instance) return
+    const previous = instance.onSearchChange
+    instance.onSearchChange = (value) => {
+      previous?.(value)
+      setResult(value)
+    }
+    setResult(instance.getSearchState())
+    return () => { instance.onSearchChange = previous }
+  }, [instance])
 
   useEffect(() => {
     if (!instance) return
