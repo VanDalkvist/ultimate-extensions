@@ -1,4 +1,5 @@
 import { constants, accessSync, readFileSync, statSync } from 'node:fs'
+import { userInfo } from 'node:os'
 import { basename, isAbsolute, normalize } from 'node:path'
 
 /** Only shells whose interactive/login launch flags we explicitly support. */
@@ -52,9 +53,13 @@ export function detectShells(probe: ShellProbe): ShellCatalog {
 export function installedShells(): ShellCatalog {
   let shellsFile = ''
   try { shellsFile = readFileSync('/etc/shells', 'utf8').slice(0, 16 * 1024) } catch { /* missing list */ }
+  // Consult the OS account database first: $SHELL can be stale or overridden
+  // by the process that launched Ultimate.
+  let loginShell = process.env.SHELL
+  try { loginShell = userInfo().shell ?? loginShell } catch { /* account lookup unavailable */ }
   return detectShells({
     platform: process.platform,
-    loginShell: process.env.SHELL,
+    loginShell,
     shellsFile,
     executable(path) {
       try {
