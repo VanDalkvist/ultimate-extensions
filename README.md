@@ -9,6 +9,7 @@ that Ultimate discovers; no fork of the core, no patched upstream.
 | [Files](extensions/files)                       | Browse and edit the project's files, with a Markdown preview          |
 | [Terminal](extensions/terminal)                 | A bounded macOS and Linux terminal in the browser, started explicitly           |
 | [Subscription usage](extensions/subscription-usage) | Provider quota in the status line                                 |
+| [Themes](extensions/themes)                     | Choose Default or Obsidian Minimal per project                       |
 | [Mihomo VPN](extensions/vpn) | Control an existing Mihomo proxy: choose a server, check latency, open Dashboard and settings |
 
 These are the **Solid** versions: each browser facet is `web.solid.tsx`, so no React compatibility layer is needed.
@@ -32,6 +33,8 @@ cp -r extensions/<name> <project>/.ultimate/extensions/
 If that destination already exists (including a dangling symlink), inspect it first; do not overwrite it. Ultimate discovers the personal extension and rebuilds the web bundle; no server restart is needed. To uninstall, disable it in Ultimate or remove only the symlink you created.
 
 [Terminal](extensions/terminal) needs `npm ci` inside its folder afterwards and a required macOS source build; follow its README using the host's Node. [Mihomo VPN](extensions/vpn) requires `git submodule update --init --recursive` and has its own safe installer/readiness check; initialize its dependency before copying it. Mihomo VPN targets the native Solid 2 facet API; it does not manage WireGuard tunnels. [Files](extensions/files) needs `pnpm install --frozen-lockfile` inside its folder for the editor and preview. The remaining extensions have no dependency installation.
+
+[Themes](extensions/themes) uses Ultimate’s native Solid extension API and needs no dependency installation. Copy `extensions/themes` as shown above, reload, and run **Choose a color theme** in the command palette. Pick **Obsidian Minimal**, then select **Default** to remove the overrides.
 
 ## Screenshots
 
