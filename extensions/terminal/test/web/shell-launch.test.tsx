@@ -7,7 +7,7 @@ const agent = { owner: 'agent' as const, secretToken: 'agent-test-token' }
 
 function surface() {
   let running = false
-  const inspect = vi.fn<() => Promise<typeof agent | null>>().mockResolvedValue(null)
+  const inspect = vi.fn<() => Promise<typeof user | typeof agent | null>>().mockResolvedValue(null)
   const open = vi.fn<(size: typeof terminal) => Promise<typeof user>>().mockResolvedValue(user)
   const attach = vi.fn<(value: typeof user | typeof agent) => void>(() => {
     running = true
