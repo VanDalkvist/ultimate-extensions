@@ -1,26 +1,19 @@
-A bounded macOS and Linux terminal in the browser: one host PTY, explicitly started, with a discoverable choice of installed shells.
+A bounded macOS and Linux terminal inside Ultimate: one real host PTY with an explicit Start/Stop and a choice of installed login shells.
 
-**Open shell** in the title bar hands one trusted click to the committed Terminal surface; the Terminal tab, the phone
-menu, the palette, tool cards and a restored view only navigate. **Start shell** in the view always starts one.
+**Open shell** in the title bar navigates to Terminal. Only **Start shell** or a separately approved agent request creates a new process.
 
-![Terminal: one shell, explicit start, its bounds in the header](../../docs/terminal.png)
+![Terminal preview from the host before this revision](../../docs/terminal.png)
 
-## Shell choice (macOS and Linux)
+## Choose a shell
 
-The Shell dropdown discovers **installed** Zsh, Bash and Fish from `/etc/shells`, the login-shell environment and conventional system/Homebrew paths. A shell is offered only when its executable is present; it never installs packages or calls `chsh`.
+The Shell menu discovers installed **Zsh**, **Bash** and **Fish**, using the OS account's login shell, `/etc/shells`, and standard system/Homebrew/Linuxbrew locations. Discovery does not spawn a command or change the OS configuration.
 
-- **System default** picks your OS account's login shell (with `$SHELL` only as fallback) when verified, falling back to Zsh on macOS or Bash on Linux, if available.
-- Choose `/bin/zsh`, `/opt/homebrew/bin/zsh`, Bash or Fish to save that executable as the **Ultimate terminal default**. It persists via Ultimate's extension UI state across reloads/tabs, for user-started and approved agent-owned shells.
-- Selecting another shell never stops a running PTY. The selection applies when the next shell starts. The server re-discovers and validates the executable before every launch, not merely when displaying the menu.
-- Shells launch in login + interactive mode (`-l -i`) to load normal prompt, completion and user configuration. Your own startup scripts may enable history or run commands; this is a real OS shell, **not a sandbox**.
-- If `chsh` says “no changes made” on macOS yet this Terminal still shows `bash-3.2A bounded macOS and Linux terminal in the browser: one host PTY, started explicitly, with the shell's bounds stated where you start it.
-
-**Open shell** in the title bar hands one trusted click to the committed Terminal surface; the Terminal tab, the phone
-menu, the palette, tool cards and a restored view only navigate. **Start shell** in the view always starts one.
-
-![Terminal: one shell, explicit start, its bounds in the header](../../docs/terminal.png)
-
-, the old extension's hardcoded Bash was the cause. The picker removes that hardcoded launch.
+- **System default** resolves the OS account login shell (falling back to the verified `$SHELL`, then macOS Zsh or Linux Bash).
+- Selecting an explicit executable such as `/bin/zsh` saves the default **for this browser on this Ultimate origin**. The preference persists across reloads and browser tabs through a single namespaced `localStorage` key. It is not synchronized across different browsers/devices.
+- A selection applies to **future** manual and agent-approved shells; it does not interrupt the running session. On every start, the server validates the selected path again against installed executable shells.
+- Shells start with `-l -i`, so personal shell startup scripts can run. They have **full OS user privileges**, not sandbox restrictions. A user script may override the history settings.
+- Changing the account's login shell with `chsh` does not change a terminal that was explicitly launched as Bash. This version removes the hardcoded Bash executable.
+- If browser storage is unavailable, the selection works for the current UI lifetime but is not persisted.
 
 ## Find and share with the agent
 
