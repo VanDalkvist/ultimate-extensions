@@ -7,7 +7,6 @@
     "@earendil-works/pi-schema": "1.6.0",
     "@wterm/dom": "0.5.10",
     "@wterm/ghostty": "0.5.10",
-    "@wterm/react": "0.5.10",
     "node-pty": "1.1.0"
   }
 }
