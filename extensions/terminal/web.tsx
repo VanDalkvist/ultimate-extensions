@@ -329,7 +329,7 @@ function TerminalSurface() {
               Terminal
             </span>
           </Header>
-          <div className="terminal-toolbar flex items-center gap-3 border-b border-border/70 px-3 py-2">
+          <div className="terminal-toolbar flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border/70 px-3 py-2">
             <div className="terminal-summary min-w-0 flex-1 text-[11px] text-muted-foreground">
               <p className="truncate font-mono">
                 {opened?.cwd ?? 'Fixed project directory · /bin/bash --noprofile --norc -i'}
