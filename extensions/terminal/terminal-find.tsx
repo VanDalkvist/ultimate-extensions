@@ -1,6 +1,6 @@
 import type { WTerm } from '@wterm/dom'
 import { CaseSensitiveIcon, ChevronDownIcon, ChevronUpIcon, SearchIcon, XIcon } from 'lucide-react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { isTerminalFindShortcut } from './terminal-keybindings.ts'
 
@@ -26,6 +26,8 @@ export function TerminalFind({ instance }: { instance: WTerm | null }) {
   const [query, setQuery] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(false)
   const input = useRef<HTMLInputElement>(null)
+  const anchor = useRef<HTMLDivElement>(null)
+  const [popoverTop, setPopoverTop] = useState(96)
 
   useEffect(() => {
     if (!instance) return
@@ -45,10 +47,18 @@ export function TerminalFind({ instance }: { instance: WTerm | null }) {
   }, [instance, visible, query, caseSensitive])
 
   useLayoutEffect(() => {
-    if (visible) {
-      input.current?.focus()
-      input.current?.select()
+    if (!visible) return
+    input.current?.focus()
+    input.current?.select()
+    // On narrow screens the popover is viewport-fixed to prevent its
+    // right-aligned width from rendering off the left side of the screen.
+    const update = () => {
+      const bottom = anchor.current?.getBoundingClientRect().bottom
+      if (bottom !== undefined) setPopoverTop(Math.max(8, bottom + 6))
     }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
   }, [visible])
 
   useEffect(() => {
@@ -79,7 +89,7 @@ export function TerminalFind({ instance }: { instance: WTerm | null }) {
   }
 
   return (
-    <div className="relative shrink-0">
+    <div ref={anchor} className="relative shrink-0">
       <Button
         aria-expanded={visible}
         aria-label="Find in terminal output"
@@ -106,6 +116,7 @@ export function TerminalFind({ instance }: { instance: WTerm | null }) {
             }
           }}
           className="absolute right-0 top-full z-30 mt-2 terminal-find-panel rounded-lg border border-border bg-background p-2 shadow-lg"
+          style={{ '--terminal-find-top': `${popoverTop}px` } as CSSProperties}
           role="search"
         >
           <div className="flex min-w-0 items-center gap-1">
