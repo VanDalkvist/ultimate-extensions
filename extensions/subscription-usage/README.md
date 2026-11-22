@@ -13,12 +13,13 @@ provider simply does not appear.
 
 ## Install
 
+From the repository root, run:
+
 ```sh
-mkdir -p "$HOME/.ultimate/extensions"
-cp -r extensions/subscription-usage "$HOME/.ultimate/extensions/"
+bash scripts/install-subscription-usage.sh
 ```
 
-Nothing else to install.
+The installer updates only the known extension source files and preserves local changes as timestamped backups. It disables the obsolete installed React `web.tsx` by renaming it, and **does not touch** `~/.ultimate/subscription-usage.sqlite`, browser state or credentials. A plain `git pull` or `cp -r` alone can leave stale files in `~/.ultimate/extensions/subscription-usage/`.
 
 ## Ultimate 0.1
 
