@@ -20,14 +20,17 @@ export type ShellProbe = {
  */
 export function detectShells(probe: ShellProbe): ShellCatalog {
   const candidates: Array<{ path: string; origin: ShellOption['origin'] }> = []
-  if (probe.loginShell) candidates.push({ path: probe.loginShell, origin: 'login' })
-  for (const line of (probe.shellsFile ?? '').split(/\r?\n/)) {
-    const path = line.trim()
-    if (path && !path.startsWith('#')) candidates.push({ path, origin: 'system' })
+  const registered = (probe.shellsFile ?? '').split(/\r?\n/)
+    .map(line => line.trim()).filter(path => path && !path.startsWith('#'))
+  const known = ['/bin', '/usr/bin', '/usr/local/bin', '/opt/homebrew/bin', '/home/linuxbrew/.linuxbrew/bin']
+    .flatMap(directory => names.map(name => directory + '/' + name))
+  // Inherited $SHELL is a preference, not a trusted executable registry:
+  // arbitrary project-provided paths must not become default PTY executables.
+  if (probe.loginShell && [...registered, ...known].includes(probe.loginShell)) {
+    candidates.push({ path: probe.loginShell, origin: 'login' })
   }
-  for (const directory of ['/bin', '/usr/bin', '/usr/local/bin', '/opt/homebrew/bin', '/home/linuxbrew/.linuxbrew/bin']) {
-    for (const name of names) candidates.push({ path: directory + '/' + name, origin: 'installed' })
-  }
+  for (const path of registered) candidates.push({ path, origin: 'system' })
+  for (const path of known) candidates.push({ path, origin: 'installed' })
   const shells: ShellOption[] = []
   const seen = new Set<string>()
   for (const candidate of candidates) {
