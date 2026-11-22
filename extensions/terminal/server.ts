@@ -426,7 +426,7 @@ export const actions = {
     if (!p || p.id !== args.requestId || p.expires <= Date.now() || (session && !session.ended))
       throw fail()
     pending = undefined // Consume before spawn: a repeated click cannot start another shell.
-    await actions.open({ cols: 80, rows: 24 }, ctx)
+    await actions.open({ cols: 80, rows: 24, shell: args.shell }, ctx)
     const s = session!
     s.owner = 'agent'
     grant(s, p.conversation)
