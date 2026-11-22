@@ -43,3 +43,13 @@ User explicitly requested fixing Usage, Skyscraper, Terminal together via the fu
 - Do not change the server 10-minute cap without owner approval; fully persistent shells would otherwise introduce long-lived OS privileges.
 - Do not pretend an updated Git checkout modifies a different active project extension override. Script must reveal exact winning path and back up only known facet files.
 - Gate S9 remains blocked until an actual Ultimate macOS build/browser/PTY smoke test is run. Existing user authorization covers source fixes, not fabricated verification.
+
+
+## S7 critical review addendum — BFCache must not duplicate historical terminal output
+
+The browser's BFCache preserves the WTerm DOM and its rendered text. A resumed `Inspect` currently returns replay bytes from the start of retained history; simply reattaching after `pageshow` appends historical output again.
+
+- [ ] Add an isolated pure `terminalResumePlan(opened, snapshot, existing)` with behavioral tests: same session uses the last actually rendered cursor and skips history replay; a different session resets the old emulator view before normal replay; a fresh mount behaves unchanged.
+- [ ] Store only `{ sessionId, cursor }` in the mounted Terminal component on `pagehide`, **not** persistent storage or a bearer token. Update the rendered cursor after writing bytes to WTerm. `ack` remains server-bound and must only advance over already displayed bytes.
+- [ ] Use a full terminal reset escape (`ESC c`) only if a BFCache-preserved WTerm is now displaying a different native PTY; never send an escape to the PTY, never run a new shell merely to redraw the UI.
+- [ ] Verify the pure state transition and the existing launch/Inspect ordering; native browser/Ghostty rendering still requires Mac smoke testing.
