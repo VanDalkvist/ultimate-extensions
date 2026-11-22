@@ -340,7 +340,7 @@ export default defineWebExtension({
     {
       id: 'subscription-usage.open',
       title: 'Открыть лимиты подписок',
-      run: (context) => context.openPanel('subscription-usage'),
+      run: (context) => openUsageDetails(context),
     },
   ],
 })
