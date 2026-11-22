@@ -243,6 +243,28 @@
 - Post-merge branch hygiene: former PR #4 and #5 heads each have 0 commits ahead of \`main\`; safe to delete. Branch deletion needs a dedicated Git ref delete capability; do not pretend moving refs equals deletion.
 
 
+## Cycle 5 — 2026-11-22 — Obsolete React facets after Ultimate 0.1
+
+**Context:** The user reported `files`, `skyscraper`, `subscription-usage` failing in their actual Ultimate UI. Ultimate upstream `extensions/README.md` confirms React `web.tsx` was removed in 0.1; the supported facet is `web.solid.tsx`. Prior Terminal source checks missed a real `ActionError` export incompatibility, so source inspection must not be presented as proof of a running extension.
+
+**Scope and source map:**
+- `VanDalkvist/ultimate-extensions`: `subscription-usage`, `right-panel-resize`, `files`.
+- **`VanDalkvist/bb-plugin-skyscraper`: separate repository.** Its extension must remain there; dedicated draft PR #2. No skyscraper files copied into `ultimate-extensions`.
+- Files is in a separate draft PR #8 because it contains unsaved user data and autosave; this branch only carries Subscription Usage and right-panel-resize.
+
+**S4–S8 severity review / repair:**
+- **P0 fixed in PR #7:** `subscription-usage/web.tsx` is rejected by Ultimate 0.1. Reimplemented status-line chip, panel, per-provider refresh, pin/unpin, error/stale display and event-driven shared reads as `web.solid.tsx` using supported `@/sdk/solid` and `@lucide/solid`. Original provider/cache `server.ts` unchanged.
+- **P1 fixed in PR #7:** `right-panel-resize/web.tsx` was a stale React wrapper alongside an already-native `web.solid.tsx`. Deleted only the old facade; kept Solid overlay and server-independent resize implementation untouched.
+- **P1 isolated to separate repo:** Skyscraper's React iframe panel is migrated in `bb-plugin-skyscraper` draft PR #2. No cross-repository code copy or game runtime changes.
+- **P1 isolated to separate PR:** Files' 700ms autosave, recovery snapshots and Tiptap lossless Markdown editor require a migration without silently losing data; draft PR #8, not merged.
+- **P2 documented:** Installed `~/.ultimate/extensions/*` are local copies. A commit to remote GitHub does not update them, and simply adding `web.solid.tsx` without deleting obsolete installed `web.tsx` will not necessarily clear the React error card.
+
+**S9 source checks:** The changed Subscription Usage and resize directories each contain exactly one `web.solid.tsx`, zero remaining `web.tsx` or React/lucide-react/old SDK imports. Native Usage server unchanged. SDK contracts compared with upstream `docs/extensions/actions.md` / `docs/extensions/slots.md` (accessor readers, event subscription, panel and status slot).
+
+**S9 outcome: BLOCKED, NOT PASS.** The compiled Solid build, browser error-card disappearance, actual provider actions and macOS visual interaction are not executed here. Draft PR #7 awaits running host verification. No GitHub Actions added.
+
+**S10 learning:** Always inventory *all installed facets* and the actual host framework version before porting an individual component. Isolation by repo/extension is not a reason to put a product plugin into a shared tooling repository. Keep high-risk user-data migrations apart from low-risk panel upgrades.
+
 ## Cycle 5B — 2026-11-22 — Files Solid 2, preserve drafts (Draft PR #8)
 
 **Source context:** Ultimate 0.1 rejects React `web.tsx`; user reported a real Files error card. Unlike Skyscraper (which remains exclusively in `VanDalkvist/bb-plugin-skyscraper`), Files belongs to `ultimate-extensions`. Current upstream `extensions/README.md`, `skills/solid-ui/SKILL.md`, `docs/extensions/actions.md` and SDK provide the contract.
