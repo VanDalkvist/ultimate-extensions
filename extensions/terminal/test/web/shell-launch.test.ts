@@ -166,3 +166,24 @@ it('restores an interrupted inspect after BFCache pageshow and consumes one user
   await Promise.resolve()
   expect(view.open).toHaveBeenCalledOnce()
 })
+
+it('preserves a user return while a stale Open is being closed after pagehide', async () => {
+  const view = surface()
+  const oldOpen = Promise.withResolvers<typeof user>()
+  view.open.mockReturnValueOnce(oldOpen.promise)
+  view.launch.ready(terminal)
+  view.launch.request()
+  await Promise.resolve()
+  expect(view.open).toHaveBeenCalledOnce()
+
+  // The old opened capability becomes an orphan after browser pagehide.
+  view.launch.hide()
+  view.launch.show()
+  view.launch.request()
+  oldOpen.resolve(user)
+  await Promise.resolve()
+  await Promise.resolve()
+  expect(view.close).toHaveBeenCalledOnce()
+  expect(view.open).toHaveBeenCalledTimes(2)
+  expect(view.attach).toHaveBeenCalledOnce()
+})
