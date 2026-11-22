@@ -386,7 +386,13 @@ type TerminalDetails = {
   truncated?: boolean
 }
 function ApprovalCard(props: { requestId: string; details: TerminalDetails }) {
-  const [defaultShell] = useExtensionUiState<string>('default-shell', 'system')
+  const [defaultShell, setDefaultShell] = useExtensionUiState<string>('default-shell', 'system')
+  const shells = useAction(Shells, {})
+  const validShell = () => {
+    const catalog = shells.data()
+    return !!catalog?.shells.length &&
+      (defaultShell() === 'system' || catalog.shells.some((shell) => shell.path === defaultShell()))
+  }
   const available = useAction(Approval, { requestId: props.requestId }, { every: 1000 })
   const [choice, setChoice] = createSignal('')
   const [canOpen, setCanOpen] = createSignal(false)
@@ -394,7 +400,7 @@ function ApprovalCard(props: { requestId: string; details: TerminalDetails }) {
   let inFlight = false
 
   async function decide(approve: boolean) {
-    if (inFlight || choice()) return
+    if (inFlight || choice() || (approve && !validShell())) return
     inFlight = true
     setBusy(true)
     try {
@@ -442,6 +448,16 @@ function ApprovalCard(props: { requestId: string; details: TerminalDetails }) {
         Full OS user privileges. Approving creates one agent-owned shell and lets
         this conversation read, write and close it for five minutes. No command sandbox.
       </p>
+      <div class="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <span>Shell for this session</span>
+        <TerminalShellPicker catalog={shells.data} value={defaultShell}
+          runningShell={() => undefined} onChange={setDefaultShell} />
+      </div>
+      <Show when={!shells.loading() && !validShell()}>
+        <p class="text-[12px] text-error" role="alert">
+          Choose an installed shell before approving this request.
+        </p>
+      </Show>
       <Show when={choice()} fallback={
         <Show when={available.data()?.available} fallback={
           <p class="text-muted-foreground" role="status">
@@ -450,7 +466,7 @@ function ApprovalCard(props: { requestId: string; details: TerminalDetails }) {
           </p>
         }>
           <div class="flex gap-2">
-            <Button size="sm" disabled={busy()} onClick={() => void decide(true)}>Approve &amp; continue</Button>
+            <Button size="sm" disabled={busy() || !validShell()} onClick={() => void decide(true)}>Approve &amp; continue</Button>
             <Button size="sm" variant="outline" disabled={busy()} onClick={() => void decide(false)}>Deny</Button>
           </div>
         </Show>
