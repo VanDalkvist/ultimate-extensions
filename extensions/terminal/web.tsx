@@ -134,6 +134,8 @@ function TerminalSurface() {
   const mounted = useRef(false)
   const [ready, setReady] = useState(false)
   const [launching, setLaunching] = useState(false)
+  const [changingGrant, setChangingGrant] = useState(false)
+  const grantInFlight = useRef(false)
   const [terminalInstance, setTerminalInstance] = useState<WTerm | null>(null)
 
   const [{ stop, leave, pagehide, failed }] = useState(() =>
@@ -344,23 +346,45 @@ function TerminalSurface() {
               <Button
                 size="sm"
                 variant="outline"
-                title="Allow this conversation to read and write the full-privilege shell for five minutes"
+                disabled={changingGrant || (!access?.grant && conversation === undefined)}
+                title="Grant or revoke full read/write control of this OS-privileged shell; sharing a selection does not grant access"
                 onClick={async () => {
+                  if (grantInFlight.current) return
+                  grantInFlight.current = true
+                  setChangingGrant(true)
                   try {
-                    setAccess(
-                      access?.grant
-                        ? await api.action(Revoke, { secretToken: opened.secretToken })
-                        : await api.action(GrantAction, {
-                            secretToken: opened.secretToken,
-                            conversation: conversation!,
-                          }),
-                    )
+                    const updated = access?.grant
+                      ? await api.action(Revoke, { secretToken: opened.secretToken })
+                      : await api.action(GrantAction, {
+                          secretToken: opened.secretToken,
+                          conversation: conversation!,
+                        })
+                    setAccess(updated)
+                    setError(false)
+                    setState('Running')
                   } catch {
-                    failed()
+                    // A failed grant/revoke response is not a terminal fault.
+                    // The command may have succeeded despite network failure:
+                    // reconcile the effective server-side permission via Inspect.
+                    try {
+                      const current = await api.action(Inspect, {})
+                      if (current?.sessionId === opened.sessionId) setAccess(current)
+                    } catch {
+                      // Leave the shell alive and report uncertain access.
+                    }
+                    setState('Shell access change not confirmed · check status before retrying')
+                    setError(true)
+                  } finally {
+                    grantInFlight.current = false
+                    setChangingGrant(false)
                   }
                 }}
               >
-                {access?.grant ? 'Revoke agent' : 'Allow agent · 5 min'}
+                {changingGrant
+                  ? 'Updating access…'
+                  : access?.grant
+                    ? 'Revoke shell control'
+                    : 'Allow shell control · 5 min'}
               </Button>
             )}
             <Button
@@ -385,9 +409,9 @@ function TerminalSurface() {
           ) : (
             <div
               className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/50 px-3 py-1.5 font-mono text-[10px] text-muted-foreground"
-              role="status"
+              role={error ? 'alert' : 'status'}
             >
-              <span className="text-foreground">{state}</span>
+              <span className={error ? 'text-error' : 'text-foreground'}>{state}</span>
               <span>PID {opened.pid}</span>
               <span title={access?.grant
                 ? 'Agent can read and write the shell until ' + new Date(access.grant.expires).toLocaleTimeString()
