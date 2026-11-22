@@ -1,13 +1,5 @@
 import { expect, it } from 'vitest'
-import {
-  beginSave,
-  dirty,
-  loaded,
-  opening,
-  restore,
-  saved,
-  snapshot,
-} from '../../buffers.ts'
+import { beginSave, dirty, loaded, opening, restore, saved, snapshot } from '../../buffers.ts'
 
 it('recovers a tab-local draft and only acknowledges the text actually saved', () => {
   const read = { path: 'README.md', secretText: '# Original', version: 'v1', bytes: 10 }

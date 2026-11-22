@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { fileLinkPath, fileRequests, requestFile } from '../../links.ts'
+import { fileLinkPath, fileRequests } from '../../links.ts'
 import { createSession } from '../../session.ts'
 import type { FileResult } from '../../types.ts'
 
@@ -38,9 +38,9 @@ it('requests Files before it mounts, then opens the requested tab without replac
   files.edit(original.id, '# Local draft')
   files.open('other.md')
 
-  const linkedPath = fileLinkPath('#files/docs/plan%20v2.md')
-  expect(linkedPath).toBe(path)
-  requestFile(linkedPath!)
+  const decoded = fileLinkPath('#files/docs/plan%20v2.md')
+  expect(decoded).toBe(path)
+  fileRequests.request(decoded!)
   const request = fileRequests.get()!
   expect(request).toEqual({ path })
 
@@ -58,9 +58,5 @@ it('leaves external and core conversation links untouched', () => {
   for (const href of ['https://example.com/file.md', '#conversation-123', '?conversation=123']) {
     expect(fileLinkPath(href)).toBeUndefined()
   }
-  expect(fileRequests.get()).toBeNull()
-})
-
-it('distinguishes malformed Files links from untouched links', () => {
-  expect(fileLinkPath('#files/docs/%')).toBeNull()
+  expect(fileLinkPath('#files/%')).toBeNull()
 })

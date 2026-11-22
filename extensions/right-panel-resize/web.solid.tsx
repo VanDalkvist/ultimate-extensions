@@ -181,4 +181,4 @@ function Overlay() {
 }
 
 export { Overlay }
-export default defineWebExtension({ slots: { overlay: Overlay } })
+export default defineWebExtension({ slots: { overlay: [Overlay] } })

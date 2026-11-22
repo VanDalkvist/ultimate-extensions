@@ -1,4 +1,3 @@
-import { createEffect, createSignal, onSettled } from 'solid-js'
 import { actionRef, api, errorMessage } from '@/sdk/solid'
 import type { DirectoryResult, FileResult, SaveResult } from './types.ts'
 import { beginSave, dirty, loaded, opening, restore, saved, snapshot } from './buffers.ts'
@@ -183,7 +182,7 @@ export function createSession(root: string) {
   }
 }
 
-function session(root: string) {
+export function session(root: string) {
   if (!sessions.size) {
     // Files may unmount on a surface switch while drafts or a save are still live (#2840).
     window.addEventListener('beforeunload', (event) => {
@@ -199,25 +198,4 @@ function session(root: string) {
     sessions.set(root, value)
   }
   return value
-}
-
-export function useFiles(root: string) {
-  const files = session(root)
-  const [state, setState] = createSignal(files.get())
-
-  onSettled(() => {
-    const unsubscribe = files.subscribe(() => setState(files.get()))
-    // A read can finish while the component mounts; reconcile the snapshot
-    // after the listener becomes active so no loaded draft is missed.
-    setState(files.get())
-    return unsubscribe
-  })
-
-  // The session survives view switches. Its timers and asynchronous writes
-  // are server-backed and must not be destroyed on surface unmount.
-  createEffect(() => state().tabs, (tabs) => {
-    files.load(tabs)
-  })
-
-  return { state, ...files }
 }

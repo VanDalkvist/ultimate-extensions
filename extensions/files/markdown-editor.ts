@@ -9,7 +9,7 @@ import {
   serializeMarkdown,
 } from './markdown-document.ts'
 
-type MarkdownEditorProps = {
+export type MarkdownEditorProps = {
   path: string
   value: string
   onChange: (text: string) => void
@@ -137,4 +137,3 @@ export function createMarkdownEditor({
     },
   }
 }
-

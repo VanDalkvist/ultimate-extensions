@@ -9,11 +9,9 @@ Each side remembers its own width after a completed drag, keyboard change, reset
 The public Solid SDK provides the `overlay` slot, surface and conversation selection, panel state, viewport, notifications, and durable UI state. It does not provide a width setter. `panel.ts` only matches the Agent shell’s unique `main` containing a direct `[data-ui="conversation"]`:
 
 - Left: the first direct sibling immediately before `main`, an `aside` with `w-72`, `border-r`, `overflow-y-auto`, and the shell's sidebar color utilities.
-- Right: the last direct sibling immediately after `main`, an `aside` with `w-[22rem]`, `border-l`, and `bg-sidebar`. Its tab and content descendants are not part of the match.
+- Right: the last direct sibling immediately after `main`, an `aside` with `w-[22rem]`, `border-l`, and `bg-sidebar`, with the host’s PanelTabs and scroll-content structure.
 
 The extension runs on desktop only. Once the composer mounts, an expected region that does not match is left unchanged and gets a warning. The root slot owns both fixed-position handles; the only modified property on an aside is its inline `width`, restored on detach. Neither the panels nor their contents are replaced or reloaded by the extension.
-
-The Solid shell now wraps PanelTabs and tab content in one Tabs container (`web/src/app/shell.solid.tsx`, `Panels`). Requiring the former pair of direct child divs rejected the real panel while tests using the old fixture still passed. The regression fixture reflects the live shell. This remains a private outer-shell DOM dependency, not a public width API: after a host upgrade, open an existing panel and check that both separators appear, change the right width, and reset it in the running host before trusting fixture-only tests. Do not add inner-content selectors to identify a shell region.
 
 ## Development
 
@@ -23,7 +21,3 @@ Run from the collection root with the Ultimate clone alongside it and its depend
 node "${ULTIMATE_CLONE:-../ultimate}/scripts/check-extension.ts" "$PWD/extensions/right-panel-resize"
 node --test --test-timeout=30000 extensions/right-panel-resize/test/*.test.ts
 ```
-
-For browser verification, `ultimate.detached` disables shared UI writes: use it for geometry, not proof that widths persist. Persistence needs your own writable isolated preview/profile, not removal of that protection in the user's live profile. The host's `web/src/sdk/ui-state.ts` (`tabWrites`) defines the write boundary.
-
-Record original preferences for both left and right panels, then change, flush pending UI writes, reload and read back the saved widths. Report preferred persisted widths separately from viewport-effective clamping and measured left/right geometry. Restore the original preferences in `finally`, flush and verify restoration. A detached reload mismatch is a test-setup error, not evidence that the user changed widths.

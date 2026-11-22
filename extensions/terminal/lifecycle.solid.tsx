@@ -1,4 +1,4 @@
-import { retriedLater } from './errors.ts'
+import { retriedLater } from '../../../lib/errors.ts'
 
 type ViewSession = {
   owner: 'user' | 'agent'
@@ -14,16 +14,11 @@ export function terminalViewLifecycle(options: {
   function release(explicit: boolean, failure?: string) {
     const session = options.take()
     session?.abort.abort()
-    // Switching surfaces, browser refresh and page navigation detach the
-    // reader but never kill a still-bounded PTY. Explicit Stop and a fatal
-    // manual transport failure retain their original close semantics.
-    // The server's expiry timer and host.onClose own ultimate process cleanup.
-    const detached =
-      !!session &&
-      !explicit &&
-      (session.owner === 'agent' || failure === undefined)
+    // #47345: concurrent UI readers can reject a stale cursor. Detaching a view
+    // must not kill an agent-owned shell that native tools are still using.
+    const detached = !explicit && session?.owner === 'agent'
     if (session && !detached) {
-      // The server deadline retries cleanup if this request cannot finish.
+      // The server lease retries cleanup if the unload request cannot finish.
       void options.close(session.secretToken).catch(retriedLater)
     }
     options.changed(
@@ -38,7 +33,6 @@ export function terminalViewLifecycle(options: {
   return {
     stop: () => release(true),
     leave: () => release(false),
-    pagehide: () => release(false),
     failed: (reason = 'request failed') => release(false, reason),
   }
 }

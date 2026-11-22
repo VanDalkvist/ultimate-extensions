@@ -3,9 +3,9 @@ import { join } from 'node:path'
 import type { JsonValue } from '@earendil-works/chord/json'
 import { expect, it } from 'vitest'
 import { actions, userActions } from '../server.ts'
-import type { ActionContext } from '@ultimate/server/actions.ts'
-import { callTrace } from '@ultimate/server/trace.ts'
-import { temp } from '@ultimate/test/helpers.ts'
+import type { ActionContext } from '@runtime/server/actions.ts'
+import { callTrace } from '@runtime/server/trace.ts'
+import { temp } from '@runtime/test/helpers.ts'
 
 it('lists, reads and manually saves project text, preserves mode, refuses stale content and redacts action bodies', async () => {
   const root = await temp('files-project-')

@@ -9,10 +9,12 @@ that Ultimate discovers; no fork of the core, no patched upstream.
 | [Files](extensions/files)                       | Browse and edit the project's files, with a Markdown preview          |
 | [Terminal](extensions/terminal)                 | A bounded macOS and Linux terminal in the browser, started explicitly           |
 | [Subscription usage](extensions/subscription-usage) | Provider quota in the status line                                 |
+| [VPN](extensions/vpn)                           | WireGuard tunnel status and settings in a panel                     |
 | [VPN](extensions/vpn) | Manual controls for an existing Mihomo daemon, Dashboard and settings |
 
-Written against Ultimate's extension API as of the `dfb253d` tree (November 2026): `solid-js` 2.0.3, `@ui-sdk/core` and
-`@ui-sdk/solid` 0.1.0-beta.13. They import Ultimate's own SDK (`@/sdk`, `@/components/ui`), so they run inside an
+These are the **Solid** versions: each browser facet is `web.solid.tsx`, so no React compatibility layer is needed.
+Written against Ultimate's extension API as of the `339e593` tree (22 November 2026): `solid-js` 2.0.3, `@ui-sdk/core` and
+`@ui-sdk/solid` 0.1.0-beta.13.
 Ultimate checkout rather than as standalone packages; an Ultimate that moved those APIs may need an adjustment.
 
 ## Install

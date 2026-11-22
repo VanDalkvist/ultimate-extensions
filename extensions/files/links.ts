@@ -13,6 +13,10 @@ function publish() {
 export const fileRequests = {
   subscribe,
   get: () => pending,
+  request(path: string) {
+    pending = { path }
+    publish()
+  },
   consume(request: { path: string }) {
     if (pending !== request) return
     pending = null
@@ -20,16 +24,12 @@ export const fileRequests = {
   },
 }
 
-export function fileLinkPath(href: string) {
+export function fileLinkPath(href: string): string | null | undefined {
   if (!href.startsWith('#files/')) return undefined
   try {
     return decodeURIComponent(href.slice('#files/'.length))
-  } catch {
-    return null
+  } catch (error) {
+    if (error instanceof URIError) return null
+    throw error
   }
-}
-
-export function requestFile(path: string) {
-  pending = { path }
-  publish()
 }

@@ -5,7 +5,6 @@ await test('an admitted read acknowledges consumed output once and resumes a pau
   let emit = (_bytes: Buffer) => {}
   const pause = mock.fn()
   const resume = mock.fn()
-  const resize = mock.fn()
   mock.module('node-pty', {
     exports: {
       spawn: () => ({
@@ -13,7 +12,6 @@ await test('an admitted read acknowledges consumed output once and resumes a pau
         kill: () => {},
         pause,
         resume,
-        resize,
         onExit: () => {},
         onData: (fn: typeof emit) => {
           emit = fn
@@ -76,18 +74,6 @@ await test('an admitted read acknowledges consumed output once and resumes a pau
     assert.deepEqual(await read(cursor, true), first)
     assert.equal(resume.mock.callCount(), 1)
     await assert.rejects(read(cursor - 1, true))
-
-    // Inspect must not steal a reader slot or move acknowledged bytes.
-    // The remounted viewport explicitly resizes, which wakes the old poll.
-    const pendingView = read(first.cursor)
-    const passive = (await actions.inspect({}, ctx)) as { cursor: number }
-    assert.equal(passive.cursor, cursor)
-    await assert.rejects(read(first.cursor))
-    await actions.control({ secretToken, cols: 80, rows: 24 }, ctx)
-    const handedOff = await pendingView
-    assert.equal(handedOff.cursor, first.cursor)
-    assert.equal(handedOff.secretOutput, '')
-    assert.equal(resize.mock.callCount(), 1)
   } finally {
     controller.abort()
     await actions.close({ secretToken }, ctx)

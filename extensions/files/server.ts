@@ -60,11 +60,8 @@ export const actions = {
     return access(async () => {
       const canonical = await canonicalPath(host.projectRoot, path)
       const saves = host.resource('files.saves', () => new Map<string, Promise<SaveResult>>())
-      const operation = (saves.get(canonical) ?? Promise.resolve())
-        .catch(() => {
-          // The previous caller receives its failure; a failed save must not block the next one.
-        })
-        .then(() => saveText(host.projectRoot, path, secretText, version))
+      const write = () => saveText(host.projectRoot, path, secretText, version)
+      const operation = (saves.get(canonical) ?? Promise.resolve()).then(write, write)
       saves.set(canonical, operation)
       try {
         return await operation

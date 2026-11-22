@@ -1,74 +1,45 @@
-A bounded macOS and Linux terminal inside Ultimate: one real host PTY, automatically opened when you enter Terminal, with explicit Stop and a choice of installed login shells.
+A bounded Linux terminal using WTerm in a native Solid facet, bundled Ghostty WASM and one host PTY through user-only browser actions and explicitly granted native tools.
 
-Entering the **Terminal** surface (including **Open shell** in the title bar) first checks for an existing PTY and reattaches it. If none is running and a valid shell is installed, it opens one automatically as a user-owned session. **Start shell** remains available after an explicit Stop or a failed start; agent-owned launches still require a separate approval.
+**Open shell** in the title bar switches to Terminal and starts one user-owned shell when the view is ready. If Terminal can attach an existing agent-owned shell instead, it does not start a second one. The Terminal tab (after Files), phone menu, palette, tool cards and restored view only navigate; they do not start shells. **Start shell** remains available in the Terminal view. The shell has **full OS user privileges**, starts in the host's fixed project root, and disables bash history-file writes. The project directory is not a sandbox: shell commands can access files and network with those privileges. There is no dedicated listener, websocket, reconnect, session catalog or persistent terminal state.
 
-![Terminal preview from the host before this revision](../../docs/terminal.png)
+Runtime dependencies are pinned: `@wterm/dom` and `@wterm/ghostty` 0.5.10 and `node-pty` 1.1.0. The WASM asset is the custom ABI bundled with `@wterm/ghostty`, not an official Ghostty binary.
 
-## Choose a shell
+## Session boundaries
 
-The Shell menu discovers installed **Zsh**, **Bash** and **Fish**, using the OS account's login shell, `/etc/shells`, and standard system/Homebrew/Linuxbrew locations. Discovery does not spawn a command or change the OS configuration.
+- One active PTY, 30 second renewable lease, maximum ten minute shell lifetime. A pending launch approval lasts **30 minutes**; it creates no process and does not extend a shell or grant.
+- 32 byte random capability, bound to the available admission login/address. Browser actions are user-only, not an arbitrary-code security sandbox.
+- Separate abortable read longpoll (at most five seconds), one outstanding read, and byte cursors. After consuming output, the next read acknowledges its cursor before waiting for more output. After a browser transport failure, the view can repeat the same read once after the previous longpoll window. It does not reattach, replay controls, or extend the shell lifetime. Each response carries at most 32 KiB. Unacknowledged bytes remain in a 256 KiB bounded buffer; pause at 192 KiB, resume at 64 KiB, terminate on overflow.
+- Input is byte-safe, limited to 8 KiB per event and 1 MiB per session. Browser controls are serialized separately from reads, with at most 128 queued requests and 64 KiB of queued base64 input. Failed controls end the current UI attachment and are never retried. Positive one-row/one-column dimensions are supported.
+- Explicit Stop, lease expiry and extension unload terminate the managed Linux session. Implicit UI failure, unmount and pagehide close user-owned sessions, but only detach from agent-owned shells, which may still be active. Cleanup enumerates positive PIDs in the shell's session, including normal foreground job groups; it does **not** contain deliberate daemonization/session escape. Pagehide close is best effort; lease expiry is the final disconnect boundary.
+- Natural exit while paused, or buffer overflow, is explicitly marked **output incomplete**, not successful completion. node-pty 1.1.0 can discard outstanding bytes when destroying a paused socket after child exit; no recovery is attempted. Natural-exit cleanup skips the already reaped shell leader.
+- Switching surfaces or reloading ends user-owned sessions; agent-owned views detach without closing their shell. A launch click is tab-local and consumed once; it never restores or restarts the shell. If an open reply arrives after the view leaves, the view closes the new shell using that capability. A lost reply is not retried; the server lease ends the shell. No debug, WebMCP or clipboard-write handler. The user-only transport publishes no terminal output, input or capability to documents, events, browser storage or explicit logs. Explicit native grants are different: agent read output intentionally becomes that conversation's tool result/context.
 
-- **System default** resolves the OS account login shell (falling back to the verified `$SHELL`, then macOS Zsh or Linux Bash).
-- Selecting an explicit executable such as `/bin/zsh` saves the default in Ultimate's durable **extension UI state** (`ext.terminal.default-shell`). This state survives reloads/restarts and is shared between Ultimate tabs through the host's supported state mechanism.
-- A selection applies to **future** manual and agent-approved shells; it does not interrupt the running session. On every start, the server validates the selected path again against installed executable shells.
-- Shells start with `-l -i`, so personal shell startup scripts can run. They have **full OS user privileges**, not sandbox restrictions. A user script may override the history settings.
-- Changing the account's login shell with `chsh` does not change a terminal that was explicitly launched as Bash. This version removes the hardcoded Bash executable.
-- The preference is untrusted UI state. Every new native PTY launch independently validates the requested executable on the server; no tokens, terminal output or session capability are stored in it.
+## Native tool and consent
 
-## Solid UI implementation
+The minimal project agent overlay adds only the `terminal` tool to @ultimate. Having the tool grants no shell access: every `open` creates a separate pending request and requires an actual user **Approve & continue** click before spawning. Approve consumes the request before spawn and binds the new **agent-owned** shell's **five-minute** grant to the requesting tool conversation. Deny/expiry start nothing. Extension reload invalidates pending requests; ordinary browser reload does not. A busy shell is never closed by open.
 
-This extension uses Ultimate's current **Solid 2** facet (`web.solid.tsx`) and its native SDK (`@/sdk/solid`). WTerm/Ghostty is mounted and destroyed directly through a Solid lifecycle, not through `@wterm/react`; native server PTY sessions and the read/grant/expiry protocol are unchanged. Components and DOM teardown are handled by Solid, and `npm ci` no longer installs React as a terminal-specific dependency.
+Approve returns the session ID and server-fixed requesting conversation; the browser then sends a standard `api.submit` follow-up to that conversation, and Deny likewise sends the refusal. Continuation failure after approval explicitly reports that the shell started but continuation was not delivered. A lost approval response warns that a shell may have started. Neither path retries approval or spawn.
 
-## Find and share with the agent
+**Open shell** and **Start shell** create a **user-owned** shell with agent access **off**. Its explicit Grant button grants the currently selected conversation five minutes of read/write access; Revoke immediately removes access and the separate agent output tail without killing the shell. The UI displays conversation, session ID and grant deadline. Native close only terminates agent-owned sessions. This ownership guard is not a command sandbox: arbitrary granted writes can still send shell exit or any other command with full OS-user power.
 
-- **Find** searches only WTerm's retained output, with next/previous and match-case controls. Press **⌘F** on macOS, **Ctrl+Shift+F** on Linux/Windows; ordinary **Ctrl+F** remains Bash's readline shortcut. Closing Find restores focus to the shell. On compact viewports the popover stays inside the screen.
-- **To agent** shares only a manually selected range, after an editable preview and explicit confirmation. The destination conversation is **frozen when the preview opens**: switching conversations blocks the send rather than silently redirecting potentially private logs. Maximum **12 KiB UTF-8** selected text, **24 KiB** once encoded. Control characters and fake boundary markers are represented as one quoted JSON data value, not executable instructions; this framing **cannot guarantee** immunity to prompt injection.
-- No selection is captured or uploaded automatically. **To agent never grants shell access**. **Allow shell control** is a separate, high-privilege server-authorized command granting the agent read/write access to the real OS shell for up to five minutes. Removing/renewing access and sharing text must not be confused.
-- If message delivery is not confirmed due to a network failure, **check the destination conversation before sending again**: a failed response does not prove rejection, and the preview disables blind resubmission. The client does not log or persist this selection; the confirmed message becomes part of the chosen agent conversation.
-- The existing WTerm selection supports ordinary browser **Copy**; no second terminal renderer or xterm.js addon is installed.
-- See [Terminal Experience research](../../docs/terminal-experience-research-2026-11-22.md) for ready-made open-source patterns and the next shell-integration/command-block slices.
+`status` returns session ID and grant generation only to the granted conversation. Read/write/close require that exact session/generation and the fixed tool caller identity; revoked/expired/other-conversation calls are denied before output or mutation. Native read is immediate, using a separate bounded 64 KiB byte tail and cursor, with explicit truncation. Manual grants include only future bytes, never pregrant output. Native write accepts at most 8 KiB UTF8 in `secretInput` and optional `enter`; interrupted writes must never be retried. The shared input budget still applies. Only valid native operations and user reads refresh the 30-second lease. Agent reads never advance the UI cursor or acknowledge its buffer: sustained output can therefore backpressure until a user attaches and reads the UI.
 
-## Bounds
+**Открыть терминал** switches surfaces without creating a shell or granting access. Terminal can attach an approved agent shell for the same approving admission login/address through user-only inspect; its capability stays in component memory, not shared storage. Attachment starts at the server's retained byte cursor; previously acknowledged output is not restored or replayed. Concurrent readers may cause a view to detach. Leaving the surface or an unrecovered UI read failure only detaches an agent-owned view; the shell may still be active, with its grant and lifetime limits unchanged. Explicit Stop still closes it. Native tools can operate an unattached agent-owned shell while Terminal is unmounted.
 
-- **The shell has full OS user privileges** and starts in the host's fixed project root. The project directory is not a
-  sandbox: commands reach files and the network with your user's rights.
-- One active PTY, ten minutes maximum lifetime. Manually started shells remain active when switching Ultimate
-  surfaces; agent-owned shells retain their 30 second renewable lease. A pending launch approval lives 30 minutes
-  and creates no process.
-- A 32 byte random capability bound to the admission login and address. Browser actions are user-only; this is not a
-  sandbox against arbitrary code.
-- Output is byte-bounded: 32 KiB per response, a 256 KiB buffer with pause at 192 KiB and resume at 64 KiB, 8 KiB per
-  input event, 1 MiB per session.
-- Close and expiry clean up jobs attached to the PTY, including foreground jobs in a separate process group. This is
-  not containment: jobs that detach from the session can outlive it. On macOS, the extension does not scan for jobs
-  after a natural shell exit because the controlling terminal can be reused.
-- On Agent → Terminal navigation, the new view inspects and reattaches to the same PTY, replaying up to 128 KiB
-  of acknowledged output. Older output can be lost; this is byte replay, not an exact screen snapshot (full-screen
-  programs may need to redraw). A browser page unload **detaches** the manually started shell and a reload inspects and reattaches it, provided the native core and the bounded session remain alive. When the browser retains WTerm in BFCache, the view resumes from the last displayed byte cursor without replaying old history twice; a different PTY session clears the old view.
-- No dedicated listener, websocket, session catalog or persisted terminal state. A server restart loses the session;
-  a transport failure does not reattach or extend it.
+## Browser actions
 
-## Install
+`open({cols, rows})` returns `secretToken`, PID, fixed cwd, applied dimensions and initial cursor. `inspect({})` returns attachment metadata and the retained cursor only to the session's admission identity. `read({secretToken, cursor, ack?: true})` returns base64 `secretOutput`, next byte cursor and session/buffer/completion state. Omit `ack` on first read after opening or attaching; use `ack: true` to acknowledge bytes through the requested cursor. `control({secretToken, secretInput?, cols?, rows?})` accepts base64 bytes or dimensions. `close({secretToken})` terminates. `approval/approve/deny({requestId})` manage the one pending launch request; approve/deny return its fixed requesting conversation. `grant({secretToken, conversation})` and `revoke({secretToken})` manage session access. Secret field names are intentional: the trace redactor matches them recursively. Failures use a fixed generic message, never native backend errors.
 
-Use the Ultimate host's Node version and architecture. On macOS, install the Xcode command-line tools and Python 3
-first. On Linux, see [node-pty's build prerequisites](https://github.com/microsoft/node-pty/tree/v1.1.0#dependencies).
-For an already installed Terminal, synchronize source without replacing native dependencies:
+## Verification
 
-```sh
-bash scripts/install-terminal.sh "${PWD}"
-```
+From the repository root:
 
-Run this from the project directory where Ultimate starts (or pass that directory as the argument) so an existing project-level extension cannot shadow the update. The installer backs up changed files, preserves `node_modules/node-pty`, and disables obsolete `web.tsx` rather than deleting it.
+- `node scripts/check-extension.ts .ultimate/extensions/terminal`
+- `node --experimental-test-module-mocks --test .ultimate/extensions/terminal/test/*.test.ts`
+- `pnpm vitest run --config .ultimate/extensions/terminal/test/vitest.config.ts`
+- `pnpm test .ultimate/extensions/terminal/test/web/mount.test.solid.tsx`
+- `pnpm check`
 
-For a **first-time** installation only, install native dependencies from the lockfile in `~/.ultimate/extensions/terminal` using `npm ci`.
+The Node tests cover permission/launch bounds, one-cell dimensions, reattachment after acknowledgement and exit cleanup. Vitest covers the one-shot title-bar launch and agent attachment, agent-view detach, explicit Stop, user-owned cleanup, and one bounded output-read retry with no retry after leaving the view. The Solid mount test checks automatic Inspect after WTerm readiness and disposal before a late init. These tests start no real PTYs or services. Node module mocking is experimental.
 
-**macOS requires a source build after every `npm ci`.** The `node-pty` 1.1.0 prebuilt macOS arm64 package ships a
-non-executable `spawn-helper`; installing it successfully does not mean a shell can start. Run this from the installed
-Terminal directory before opening a shell (verified on Node 26 arm64):
-
-```sh
-(cd node_modules/node-pty && npm exec --yes --package=node-gyp@13.1.0 -- node-gyp rebuild)
-```
-
-Linux uses the normal `npm ci` path; the extra rebuild step is not needed. The two pinned Pi packages match the
-current Ultimate host. The WASM asset is the custom ABI bundled with `@wterm/ghostty`, not an official Ghostty binary.
+Coordinator evidence in #47345 established real user-approved native status/write/read/close/status, access revocation after close, user-only dispatch, admission/capability rejection, trace privacy, manual commands, DSR/resize/Ctrl+C/Vim/bare Pi (without model prompts), cleanup and incomplete-output reporting. Phone/keyboard-height/desktop layout checks used intercepted RPC fixtures, not new real PTY sessions; **Открыть терминал** navigation was verified. An earlier one-off shell-completion benchmark reported p95/max 201/228 ms across 30 samples via the user screenshot proxy and 57/57 ms on the host's own route: these were not raw key-echo measurements, and the benchmark is not part of the ordinary UI.
