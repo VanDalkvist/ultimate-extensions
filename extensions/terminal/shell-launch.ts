@@ -1,4 +1,4 @@
-import { retriedLater } from '../../../lib/errors.ts'
+import { retriedLater } from './errors.ts'
 
 export function shellOpenIntent() {
   let pending = false
@@ -47,7 +47,7 @@ export function shellLaunch<Term extends Dimensions, Session extends Shell>(opti
   busy(busy: boolean): void
   changed(state: string, error?: boolean): void
 }) {
-  let disposed = false
+  let connected = false
   let hidden = false
   let terminal: Term | undefined
   let epoch = 0
@@ -56,10 +56,10 @@ export function shellLaunch<Term extends Dimensions, Session extends Shell>(opti
   let inspectedEpoch: number | undefined
 
   async function prepare() {
-    if (disposed || hidden || !terminal || phase !== 'idle' || options.running()) return
+    if (!connected || hidden || !terminal || phase !== 'idle' || options.running()) return
     const ready = terminal
     const version = epoch
-    const current = () => !disposed && !hidden && epoch === version
+    const current = () => connected && !hidden && epoch === version && terminal === ready
     phase = 'inspect'
     inspectedEpoch = version
     options.busy(true)
@@ -69,12 +69,11 @@ export function shellLaunch<Term extends Dimensions, Session extends Shell>(opti
       if (!current()) return
       const start = requested
       requested = false
-      if (existing?.owner === 'agent') {
+      if (existing) {
+        // The server owns the PTY; navigation only replaces the viewport.
         options.attach(existing, ready, true)
       } else if (!start) {
         options.changed('Ready · start a shell explicitly')
-      } else if (existing) {
-        options.changed('A shell is already active in another view', true)
       } else {
         phase = 'open'
         options.changed('Starting shell…')
@@ -93,23 +92,50 @@ export function shellLaunch<Term extends Dimensions, Session extends Shell>(opti
       }
     } finally {
       phase = 'idle'
-      if (!disposed) options.busy(false)
+      if (connected) options.busy(false)
+      // pagehide can supersede an inspect before it resolves. Once the
+      // original request drains, re-inspect the restored view instead of
+      // leaving a BFCache page with a disconnected terminal.
+      if (connected && !hidden && terminal && version !== epoch && !options.running()) {
+        void prepare()
+      }
     }
   }
 
   return {
+    connect() {
+      connected = true
+    },
     disconnect() {
-      disposed = true
+      connected = false
+      if (terminal) requested = false
       terminal = undefined
+      epoch++
+      // An intent still waiting for readiness survives StrictMode's mount replay on this instance.
     },
     ready(value: Term) {
-      if (disposed) return
+      if (!connected || terminal === value) return
+      if (terminal) {
+        requested = false
+        epoch++
+      }
       terminal = value
       void prepare()
     },
     request(this: void) {
-      if (disposed || hidden || options.running() || phase === 'open') return
-      if (phase === 'inspect' && inspectedEpoch !== epoch) return
+      if (!connected || hidden || options.running()) return
+      if (phase === 'open') {
+        // An old in-flight Open will be closed if its epoch was hidden.
+        // Preserve the fresh return intent so a new inspection follows it.
+        if (inspectedEpoch !== epoch) requested = true
+        return
+      }
+      if (phase === 'inspect' && inspectedEpoch !== epoch) {
+        // A request made after pageshow must survive the old inspect's
+        // cancellation; the finally block starts a fresh inspection.
+        requested = true
+        return
+      }
       requested = true
       void prepare()
     },
@@ -125,6 +151,7 @@ export function shellLaunch<Term extends Dimensions, Session extends Shell>(opti
     },
     show(this: void) {
       hidden = false
+      void prepare()
     },
   }
 }

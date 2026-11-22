@@ -11,6 +11,7 @@ import {
   UsageFailure,
 } from './providers.ts'
 import type { Runtime } from './providers.ts'
+import { registerUsageLifetime } from './lifecycle.ts'
 import { PROVIDERS } from './types.ts'
 import type { ProviderId, ProviderUsage, UsageView } from './types.ts'
 
@@ -19,8 +20,9 @@ export interface Host {
   modelRuntime: Runtime
   resource<T>(key: string, create: () => T): T
   onClose(cleanup: () => Promise<void>): void
-  onRelease(cleanup: () => Promise<void>): void
-  onOpen(callback: () => Promise<void>): void
+  onOpen(callback: (opened: {
+    defer(cleanup: () => void | Promise<void>): void
+  }) => void | Promise<void>): void
 }
 
 interface LocalState {
@@ -222,9 +224,9 @@ export const actions = {
 
 export default function subscriptionUsage(host: Host) {
   const instance = tracker(host)
-  host.onOpen(async () => instance.open())
-  host.onRelease(() => instance.close())
-  host.onClose(() => instance.close())
+  // Core swaps dispose the open scope, aborting provider work before the
+  // shared DB closes. No unsupported host.onRelease callback is required.
+  registerUsageLifetime(host, instance)
   return defineExtension({
     name: 'subscription-usage',
     hooks: [
