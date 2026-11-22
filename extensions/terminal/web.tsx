@@ -394,7 +394,11 @@ function TerminalSurface() {
                 : 'Agent has no access to this shell'}>
                 {access?.grant ? 'Agent granted · 5 min max' : 'Agent off'}
               </span>
-              <span className="ml-auto">Session ends on Stop, reload or expiry</span>
+              <span className="ml-auto">
+                {opened.owner === 'agent'
+                  ? 'Agent-owned · 30-second renewable lease'
+                  : 'Manual shell · closes on reload or after 10 min'}
+              </span>
             </div>
           )}
           {core && (
