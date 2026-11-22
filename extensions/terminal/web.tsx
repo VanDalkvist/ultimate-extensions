@@ -21,7 +21,6 @@ import {
   StatusLine,
   useAction,
   useConversation,
-  useExtensionUiState,
   useUltimate,
 } from '@/sdk'
 import type { ToolCallView } from '@/sdk'
@@ -33,6 +32,7 @@ import { TerminalFind } from './terminal-find.tsx'
 import { TerminalAgentSelection } from './terminal-agent-selection.tsx'
 import { TerminalShellPicker } from './terminal-shell-picker.tsx'
 import type { ShellCatalog } from './shells.ts'
+import { useTerminalShellPreference } from './shell-preference.ts'
 import './web.css'
 
 type Grant = { conversation: ConversationId; expires: number; generation: string }
@@ -129,7 +129,7 @@ function OpenShellButton() {
 
 function TerminalSurface() {
   const conversation = useConversation((value) => value.id)
-  const [defaultShell, setDefaultShell] = useExtensionUiState('default-shell', 'system')
+  const [defaultShell, setDefaultShell] = useTerminalShellPreference()
   const shellChoiceRef = useRef(defaultShell)
   shellChoiceRef.current = defaultShell
   const detectedShells = useAction(Shells, {})
@@ -474,7 +474,7 @@ function TerminalSurface() {
 }
 function TerminalTool({ call }: { call: ToolCallView }) {
   const { showSurface } = useUltimate()
-  const [defaultShell] = useExtensionUiState('default-shell', 'system')
+  const [defaultShell] = useTerminalShellPreference()
   const openTerminal = (
     <Button size="sm" variant="outline" onClick={() => showSurface('terminal')}>
       Открыть терминал
