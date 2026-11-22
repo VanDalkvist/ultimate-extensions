@@ -35,3 +35,9 @@ test('Alt combinations, unrelated keys, and extra modifiers do not trigger Find'
   assert.equal(isTerminalFindShortcut(key({ metaKey: true, key: 'F' }), 'MacIntel'), true)
   assert.equal(isTerminalFindShortcut(key({ ctrlKey: true, shiftKey: true, altKey: true }), 'Linux'), false)
 })
+
+test('fallback to a macOS user-agent string still recognizes Command+F', () => {
+  const macUserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+  assert.equal(isTerminalFindShortcut(key({ metaKey: true }), macUserAgent), true)
+  assert.equal(isTerminalFindShortcut(key({ ctrlKey: true, shiftKey: true }), macUserAgent), false)
+})
