@@ -74,3 +74,11 @@
 - Cause: the User Usage extension server called a removed host method `onRelease` during facet load. The updater's onLoadError early `host.system()` threw a secondary error.
 - Do next time: check *server* host lifecycle and *web* SDK compatibility together before a Solid migration. Register work within `host.onOpen(async scope => scope.defer(cleanup))`, and put process-wide resources in `host.resource` with process-level `onClose`.
 - Installation: a `git pull` does not replace files in a copied `~/.ultimate/extensions/` folder. Use a narrowly scoped backup-preserving sync, never remove SQLite or browser drafts as a workaround.
+
+
+## 2026-11-22 — Host UI shell, extension installation and native PTY are independent boundaries
+- **Symptom:** a global Usage chip visibly updates but its panel does not open; Skyscraper React error persists after source repo update; Terminal needs repeated Start and closes on page refresh.
+- **Causes:** `openPanel` changes panel state but does not mount `Panels`; Ultimate picks the last duplicate extension by builtin/user/project discovery priority; browser `pagehide` incorrectly owned the native PTY's lifetime; BFCache restored a view without re-inspection.
+- **Fix pattern:** route global panel actions to a surface with `Panels`, make local installed dependency copying exhaustive and detect project overrides, and separate Terminal view detach from PTY shutdown. In async open/inspect races, preserve the latest navigation intent and close stale capability tokens before retrying.
+- **Verify next time:** test actual side effects (ordered `showSurface/openPanel`, same PTY, no extra spawn, backup retains files) against exact Git blob source hashes. Do not use static SDK checks as proof of compiled browser behavior.
+- **Evidence:** Cycle 7 in `docs/arch-improvement/review-log.md`; `extensions/terminal/{auto-start,shell-launch,lifecycle}.ts`, `extensions/subscription-usage/navigation.ts`, `scripts/install-{terminal,subscription-usage}.sh`. The Skyscraper-only part remains in `VanDalkvist/bb-plugin-skyscraper`.
