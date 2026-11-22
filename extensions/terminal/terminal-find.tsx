@@ -124,7 +124,7 @@ export function TerminalFind({ instance }: { instance: WTerm | null }) {
               ref={input}
               aria-label="Search terminal history"
               autoComplete="off"
-              className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2 font-mono text-[12px] text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="terminal-find-input h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2 font-mono text-[12px] text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
               maxLength={160}
               placeholder="Find in output"
               type="search"
