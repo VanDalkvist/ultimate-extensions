@@ -137,7 +137,7 @@ it('returns from browser pagehide to an existing PTY without starting a duplicat
   const view = surface()
   view.inspect.mockResolvedValue(user)
   view.launch.ready(terminal)
-  await Promise.resolve()
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   expect(view.attach).toHaveBeenCalledOnce()
   expect(view.open).not.toHaveBeenCalled()
 
@@ -145,7 +145,7 @@ it('returns from browser pagehide to an existing PTY without starting a duplicat
   view.stop()
   view.launch.hide()
   view.launch.show()
-  await Promise.resolve()
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   expect(view.inspect).toHaveBeenCalledTimes(2)
   expect(view.attach).toHaveBeenCalledTimes(2)
   expect(view.open).not.toHaveBeenCalled()
@@ -160,10 +160,10 @@ it('restores an interrupted inspect after BFCache pageshow and consumes one user
   view.launch.show()
   view.launch.request() // one deliberate entry; first inspect is obsolete
   first.resolve(null)
-  await Promise.resolve()
-  await Promise.resolve()
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   expect(view.inspect).toHaveBeenCalledTimes(2)
-  await Promise.resolve()
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   expect(view.open).toHaveBeenCalledOnce()
 })
 
@@ -173,7 +173,7 @@ it('preserves a user return while a stale Open is being closed after pagehide', 
   view.open.mockReturnValueOnce(oldOpen.promise)
   view.launch.ready(terminal)
   view.launch.request()
-  await Promise.resolve()
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   expect(view.open).toHaveBeenCalledOnce()
 
   // The old opened capability becomes an orphan after browser pagehide.
@@ -181,8 +181,8 @@ it('preserves a user return while a stale Open is being closed after pagehide', 
   view.launch.show()
   view.launch.request()
   oldOpen.resolve(user)
-  await Promise.resolve()
-  await Promise.resolve()
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   expect(view.close).toHaveBeenCalledOnce()
   expect(view.open).toHaveBeenCalledTimes(2)
   expect(view.attach).toHaveBeenCalledOnce()
