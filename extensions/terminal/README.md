@@ -9,11 +9,15 @@ A bounded macOS and Linux terminal inside Ultimate: one real host PTY with an ex
 The Shell menu discovers installed **Zsh**, **Bash** and **Fish**, using the OS account's login shell, `/etc/shells`, and standard system/Homebrew/Linuxbrew locations. Discovery does not spawn a command or change the OS configuration.
 
 - **System default** resolves the OS account login shell (falling back to the verified `$SHELL`, then macOS Zsh or Linux Bash).
-- Selecting an explicit executable such as `/bin/zsh` saves the default **for this browser on this Ultimate origin**. The preference persists across reloads and browser tabs through a single namespaced `localStorage` key. It is not synchronized across different browsers/devices.
+- Selecting an explicit executable such as `/bin/zsh` saves the default in Ultimate's durable **extension UI state** (`ext.terminal.default-shell`). This state survives reloads/restarts and is shared between Ultimate tabs/devices through the host's supported state mechanism.
 - A selection applies to **future** manual and agent-approved shells; it does not interrupt the running session. On every start, the server validates the selected path again against installed executable shells.
 - Shells start with `-l -i`, so personal shell startup scripts can run. They have **full OS user privileges**, not sandbox restrictions. A user script may override the history settings.
 - Changing the account's login shell with `chsh` does not change a terminal that was explicitly launched as Bash. This version removes the hardcoded Bash executable.
-- If browser storage is unavailable, the selection works for the current UI lifetime but is not persisted.
+- The preference is untrusted UI state. Every new native PTY launch independently validates the requested executable on the server; no tokens, terminal output or session capability are stored in it.
+
+## Solid UI implementation
+
+This extension uses Ultimate's current **Solid 2** facet (`web.solid.tsx`) and its native SDK (`@/sdk/solid`). WTerm/Ghostty is mounted and destroyed directly through a Solid lifecycle, not through `@wterm/react`; native server PTY sessions and the read/grant/expiry protocol are unchanged. Components and DOM teardown are handled by Solid, and `npm ci` no longer installs React as a terminal-specific dependency.
 
 ## Find and share with the agent
 
