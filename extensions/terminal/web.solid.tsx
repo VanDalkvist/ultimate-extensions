@@ -15,7 +15,7 @@ import {
 } from '@/sdk/solid'
 import { settled } from './errors.ts'
 import { autoStartOnVisit } from './auto-start.ts'
-import { terminalResumePlan, type TerminalResumeSnapshot } from './terminal-replay.ts'
+import { terminalResumePlan, captureRenderedSnapshot, type TerminalResumeSnapshot } from './terminal-replay.ts'
 import { readActionFailure } from './action-failure.ts'
 import { terminalViewLifecycle } from './lifecycle.ts'
 import { readWithRetry } from './read-retry.ts'
@@ -63,6 +63,7 @@ type Running = Opened & {
   pending: number
   count: number
   renderedCursor: number
+  screenInitialized: boolean
 }
 const closeShell = (secretToken: string) =>
   api.action(Close, { secretToken }, { keepalive: true })
@@ -175,6 +176,7 @@ function TerminalSurface() {
       pending: 0,
       count: 0,
       renderedCursor: replay.cursor,
+      screenInitialized: false,
     }
     running = session
     try {
@@ -188,6 +190,7 @@ function TerminalSurface() {
         terminal.write(Uint8Array.from(atob(value.secretReplay), (char) => char.charCodeAt(0)))
       }
       terminal.focus()
+      session.screenInitialized = true
       let cursor = replay.cursor
       while (running === session) {
         const result = await readWithRetry(
@@ -253,10 +256,7 @@ function TerminalSurface() {
     launch.connect()
     const disconnectIntent = openIntent.connect(launch.request)
     const hide = () => {
-      if (running) retainedView = {
-        sessionId: running.sessionId,
-        cursor: running.renderedCursor,
-      }
+      retainedView = captureRenderedSnapshot(running)
       launch.hide()
       pagehide()
     }
