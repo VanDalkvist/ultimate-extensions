@@ -9,7 +9,7 @@ project_root="${1:-${ULTIMATE_PROJECT_ROOT:-$PWD}}"
 project_root="$(cd "$project_root" && pwd -P)"
 user_dir="$HOME/.ultimate/extensions/subscription-usage"
 project_dir="$project_root/.ultimate/extensions/subscription-usage"
-stamp="$(date '+%Y%m%d-%H%M%S')-$"
+stamp="$(date '+%Y%m%d-%H%M%S')-$RANDOM"
 
 # Discover and sync ALL top-level source dependencies, including navigation.ts.
 # A hand-maintained shortlist previously omitted a newly imported file and
