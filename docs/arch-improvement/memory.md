@@ -89,3 +89,11 @@
 - Retain only the current session ID and last **rendered** cursor in the component (not bearer capability, not persistent storage); on a matching session resume read from that cursor and skip replay. New session ID resets the old VT screen before normal rendering. Do not capture before the view's initial history actually reached WTerm.
 - Keep server acknowledgement and output cursor byte semantics separate from screen rendering; test both same-session and different-session cases, and explicitly report that actual Ghostty/Web UI rendering requires real runtime acceptance.
 - Evidence: `extensions/terminal/{terminal-replay.ts,web.solid.tsx}`, `test/terminal-replay.test.ts` in Cycle 7.
+
+
+## 2026-11-22 — A Solid facet sync can be a destructive rollback
+- **Symptom:** Terminal auto-start/reattachment, native shell selection, BFCache replay and Usage details stopped working again *after* Cycle 7 had already been merged.
+- **Cause:** immediate later commit `f6546e9` copied a simplified upstream snapshot over local extensions and deleted the small supporting modules and behavioral tests. Install scripts still required files that no longer existed; Usage server reintroduced the removed `onRelease` API.
+- **Fix pattern:** enumerate contractual behavior **before** syncing directories, preserve unrelated improvements, selectively restore last known-good source with immutable Git blob SHA, and add a local source admission test to detect accidental deletions. Always inspect install-time dependency closure and selected project/user duplicate.
+- **Do next time:** a rename or upstream Solid migration must migrate *all* existing host-specific behavior and tests, not just produce a compiling `web.solid.tsx`. Node/static checks do not prove a compiled macOS PTY/Usage product journey; label that gate BLOCKED until observed.
+- **Evidence:** `docs/arch-improvement/review-log.md` Cycle 8; `test/arch-loop-regressions.test.mjs`; `docs/superpowers/plans/2026-11-22-arch-improvement-cycle-8-post-solid-regression.md`.

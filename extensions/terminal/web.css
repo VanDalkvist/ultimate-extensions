@@ -1,3 +1,4 @@
+/* Mounted extensions may not be included in Ultimate's Tailwind scanner. */
 /* #47345: project-only responsive utilities are not emitted by the host scanner. */
 @media (width < 40rem) {
   .terminal-toolbar {
@@ -7,4 +8,194 @@
   .terminal-summary {
     flex-basis: 100%;
   }
+}
+
+/* WTerm controls live inside Ultimate's shared theme, but the host CSS
+   scanner cannot emit classes introduced only by this extension. */
+.terminal-find-panel {
+  width: min(22rem, calc(100vw - 2rem));
+}
+
+/* Installed user extensions can sit outside Ultimate's Tailwind @source
+   paths. Keep layout-critical chrome usable without generated utilities. */
+.terminal-find-panel {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 100%;
+  z-index: 30;
+  box-sizing: border-box;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 0.5rem);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 12px 36px oklch(0 0 0 / 0.22);
+}
+.terminal-find-panel > div:first-child {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.25rem;
+}
+.terminal-find-input {
+  flex: 1 1 0;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius, 0.5rem) - 2px);
+  background: var(--background);
+  color: var(--foreground);
+  font: 12px var(--font-mono, monospace);
+}
+.terminal-find-input:focus-visible,
+.terminal-agent-preview:focus-visible {
+  outline: 1px solid var(--ring);
+  outline-offset: 1px;
+}
+.terminal-agent-preview {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 9rem;
+  max-height: 18rem;
+  resize: vertical;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius, 0.5rem) - 2px);
+  background: var(--background);
+  color: var(--foreground);
+  font: 12px/1.5 var(--font-mono, monospace);
+}
+
+/* This rule comes after the fallback defaults to override positioning when
+   the narrow-screen layout must not allow the search panel to overflow. */
+@media (width < 40rem) {
+  .terminal-find-panel {
+    position: fixed;
+    inset-inline: 0.75rem;
+    top: var(--terminal-find-top, 6rem);
+    width: auto;
+    max-height: calc(100dvh - var(--terminal-find-top, 6rem) - 0.75rem);
+    margin-top: 0;
+    overflow-y: auto;
+  }
+}
+
+/* Compact workspace chrome: the terminal viewport takes the available room. */
+.terminal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  padding: 0.32rem 0.75rem;
+}
+.terminal-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-inline-start: auto;
+}
+.terminal-project-path {
+  min-width: 0;
+  max-width: min(32rem, 38vw);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: 11px/1.5 var(--font-mono, monospace);
+  color: var(--muted-foreground);
+}
+.terminal-session-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  font: 11px/1.5 var(--font-mono, monospace);
+}
+.terminal-dot { width: 6px; height: 6px; border-radius: 100%; background: var(--muted-foreground); }
+.terminal-dot-on { background: var(--success); }
+.terminal-message-error,
+.terminal-idle-hint {
+  padding: 0.4rem 0.75rem;
+  font: 11px/1.6 var(--font-mono, monospace);
+  color: var(--muted-foreground);
+}
+.terminal-message-error {
+  border-bottom: 1px solid var(--border);
+  color: var(--error);
+}
+.terminal-shell-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+.terminal-shell-menu {
+  position: absolute;
+  z-index: 40;
+  inset-inline-start: 0;
+  top: calc(100% + 5px);
+  width: min(21rem, calc(100vw - 1.5rem));
+  max-height: min(26rem, 70dvh);
+  overflow: auto;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 0.5rem);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 12px 36px oklch(0 0 0 / 0.22);
+}
+.terminal-shell-menu-title {
+  padding: 0.4rem 0.65rem;
+  color: var(--muted-foreground);
+  font: 11px var(--font-sans, sans-serif);
+}
+.terminal-shell-option {
+  display: flex;
+  box-sizing: border-box;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 0;
+  border-radius: calc(var(--radius, 0.5rem) - 2px);
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.terminal-shell-option:hover,
+.terminal-shell-option:focus-visible {
+  outline: none;
+  background: var(--accent);
+}
+.terminal-shell-option > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.terminal-shell-option strong {
+  font: 500 12px/1.4 var(--font-sans, sans-serif);
+}
+.terminal-shell-option small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  font: 11px/1.4 var(--font-mono, monospace);
+}
+.terminal-shell-menu-hint {
+  padding: 0.45rem 0.65rem;
+  color: var(--muted-foreground);
+  font: 10.5px/1.45 var(--font-sans, sans-serif);
+}
+@media (width < 48rem) {
+  .terminal-project-path { display: none; }
+}
+@media (width < 40rem) {
+  .terminal-toolbar { gap: 0.2rem 0.35rem; }
+  .terminal-toolbar-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .terminal-shell-menu { position: fixed; inset-inline: 0.75rem; top: 6.5rem; width: auto; }
 }

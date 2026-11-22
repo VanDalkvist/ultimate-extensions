@@ -1,12 +1,13 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { deadline, every } from '../../../lib/timers.ts'
-import { isMissing, isNoProcess } from '../../../lib/errors.ts'
+import { setTimeout, clearTimeout, setInterval, clearInterval } from 'node:timers'
 import { bool, num, obj, oneOf, opt, str } from '@earendil-works/pi-schema'
-import { readdirSync, readFileSync } from 'node:fs'
 import { defineExtension, defineTool } from '@earendil-works/pi-durable'
 import type { JsonValue } from '@earendil-works/chord/json'
 import { spawn, type IPty } from 'node-pty'
+import { errnoCode } from './errors.ts'
 import { readLongpollMs } from './refs.ts'
+import { killSessionChildren } from './session-processes.ts'
+import { installedShells, shellForStart } from './shells.ts'
 
 type Context = {
   host: { projectRoot: string }
@@ -24,6 +25,7 @@ type Session = {
   login?: string
   address?: string
   buffer: Buffer
+  history: Buffer
   base: number
   sent: number
   input: number
@@ -34,7 +36,16 @@ type Session = {
   wake?: () => void
   lease: number
   deadline: number
+  shell: string
 }
+const historyLimit = 128 * 1024
+function expired(s: Session) {
+  const now = Date.now()
+  // Manual shells survive a hidden view, but not the absolute deadline.
+  // Agent-owned shells keep the shorter renewable lease.
+  return now >= s.deadline || (s.owner === 'agent' && now >= s.lease)
+}
+
 let session: Session | undefined
 let pending: { id: string; conversation: number; expires: number } | undefined
 function revoke(s: Session) {
@@ -52,7 +63,7 @@ function grant(s: Session, conversation: number) {
 }
 function metadata(s: Session) {
   if (s.grant && s.grant.expires <= Date.now()) revoke(s)
-  return { sessionId: s.id, owner: s.owner, grant: s.grant ?? null }
+  return { sessionId: s.id, owner: s.owner, grant: s.grant ?? null, shell: s.shell }
 }
 const fail = () => new Error('Terminal request failed')
 
@@ -60,44 +71,29 @@ function terminate(s: Session, leaderExited = false) {
   if (s.ended) return
   s.ended = true
   revoke(s)
-  // Bash job control gives foreground jobs their own process group. Kill this
-  // session's positive PIDs, not just bash's group. Deliberate daemons can escape.
+  let signalLeader = !leaderExited && process.platform !== 'darwin'
   try {
-    const pids = readdirSync('/proc').filter((pid) => /^\d+$/.test(pid))
-    for (const pid of pids) {
-      try {
-        const fields = readFileSync(`/proc/${pid}/stat`, 'utf8').split(') ').at(-1)!.split(' ')
-        if (Number(fields[3]) === s.pty.pid && Number(pid) > 1 && Number(pid) !== s.pty.pid)
-          process.kill(Number(pid), 'SIGKILL')
-      } catch (error) {
-        if (!isMissing(error) && !isNoProcess(error))
-          console.error('Terminal process cleanup failed')
-      }
-    }
+    if (killSessionChildren(s.pty.pid, leaderExited)) signalLeader = true
+  } catch {
+    console.error('Terminal process cleanup failed')
   } finally {
     try {
-      // #47345/review50791: node-pty onExit has already reaped the leader;
-      // signalling its PID there risks killing a newly reused, unrelated PID.
-      if (!leaderExited) s.pty.kill('SIGKILL')
+      // On Darwin the native wait can reap the leader before JS receives onExit.
+      if (signalLeader) s.pty.kill('SIGKILL')
     } catch (error) {
-      if (!isNoProcess(error)) console.error('Terminal PTY cleanup failed')
+      if (errnoCode(error) !== 'ESRCH') console.error('Terminal PTY cleanup failed')
     }
     s.wake?.()
   }
 }
 
 export default function (host: { projectRoot: string; onClose(fn: () => Promise<void>): void }) {
-  const stopExpiry = every(
-    1000,
-    () => {
-      if (session?.grant && Date.now() >= session.grant.expires) revoke(session)
-      if (session && (Date.now() > session.lease || Date.now() > session.deadline))
-        terminate(session)
-    },
-    { unref: true },
-  )
+  const expiry = setInterval(() => {
+    if (session?.grant && Date.now() >= session.grant.expires) revoke(session)
+    if (session && expired(session)) terminate(session)
+  }, 1000).unref()
   host.onClose(async () => {
-    stopExpiry()
+    clearInterval(expiry)
     if (session) terminate(session)
     session = undefined
     pending = undefined
@@ -161,10 +157,15 @@ function authorized(args: Record<string, JsonValue>, ctx: Context) {
     s.address !== ctx.device?.address
   )
     throw fail()
-  if (Date.now() > s.lease || Date.now() > s.deadline) terminate(s)
+  if (expired(s)) terminate(s)
   return s
 }
 function acknowledge(s: Session, cursor: number) {
+  // Replay acknowledged output in a new viewport without retaining an
+  // unbounded transcript or interfering with flow control.
+  s.history = Buffer.concat([s.history, s.buffer.subarray(0, cursor - s.base)]).subarray(
+    -historyLimit,
+  )
   s.buffer = s.buffer.subarray(cursor - s.base)
   s.base = cursor
   if (s.paused && s.buffer.length <= 64 * 1024 && !s.ended) {
@@ -220,7 +221,7 @@ function nativeTerminal(args: NativeArgs, conversation: number, cwd: string): Na
     (args.sessionId !== s.id || args.generation !== s.grant.generation)
   )
     throw fail()
-  if (Date.now() >= s.lease || Date.now() >= s.deadline) {
+  if (expired(s)) {
     terminate(s)
     throw fail()
   }
@@ -267,14 +268,17 @@ export const userActions = [
   'grant',
   'revoke',
   'inspect',
+  'shells',
 ]
 export const pollActions = ['read']
 export const actions = {
+  shells: guarded(() => installedShells()),
   open: guarded((args, ctx) => {
     if (session && !session.ended) throw fail()
     const cols = integer(args.cols, 1, 500)
     const rows = integer(args.rows, 1, 200)
-    const pty = spawn('/bin/bash', ['--noprofile', '--norc', '-i'], {
+    const selected = shellForStart(args.shell, installedShells())
+    const pty = spawn(selected.path, selected.args, {
       name: 'xterm-256color',
       cols,
       rows,
@@ -292,6 +296,7 @@ export const actions = {
       login: ctx.device?.login,
       address: ctx.device?.address,
       buffer: Buffer.alloc(0),
+      history: Buffer.alloc(0),
       base: 0,
       sent: 0,
       input: 0,
@@ -301,6 +306,7 @@ export const actions = {
       incomplete: false,
       lease: Date.now() + 30_000,
       deadline: Date.now() + 600_000,
+      shell: selected.path,
     }
     session = s
     pty.onData((secretOutput) => {
@@ -343,6 +349,8 @@ export const actions = {
     const s = authorized(args, ctx)
     const cursor = integer(args.cursor, s.base, s.sent)
     if (args.ack !== undefined && args.ack !== true) throw fail()
+    // A competing reader must not steal the in-flight cursor or ack bytes.
+    // Authorized viewport handoff uses the explicit control/resize command.
     if (s.reading || ctx.signal.aborted) throw fail()
     s.reading = true
     try {
@@ -351,12 +359,12 @@ export const actions = {
       if (cursor === s.base + s.buffer.length && !s.ended && !ctx.signal.aborted) {
         await new Promise<void>((resolve) => {
           const wake = () => {
-            cancelDeadline()
+            clearTimeout(timer)
             ctx.signal.removeEventListener('abort', wake)
             s.wake = undefined
             resolve()
           }
-          const cancelDeadline = deadline(readLongpollMs, wake)
+          const timer = setTimeout(wake, readLongpollMs)
           s.wake = wake
           ctx.signal.addEventListener('abort', wake, { once: true })
           if (ctx.signal.aborted) wake()
@@ -389,6 +397,9 @@ export const actions = {
       throw fail()
     if (args.cols !== undefined || args.rows !== undefined) {
       s.pty.resize(integer(args.cols, 1, 500), integer(args.rows, 1, 200))
+      // This is an authenticated command. The remounted view resizes first;
+      // wake an old long-poll before it starts reading from the retained base.
+      s.wake?.()
     }
     if (args.secretInput !== undefined) {
       if (
@@ -414,8 +425,11 @@ export const actions = {
     const p = pending
     if (!p || p.id !== args.requestId || p.expires <= Date.now() || (session && !session.ended))
       throw fail()
+    // Validate before consuming approval: a stale browser preference must not
+    // permanently discard a pending request without starting a shell.
+    shellForStart(args.shell, installedShells())
     pending = undefined // Consume before spawn: a repeated click cannot start another shell.
-    await actions.open({ cols: 80, rows: 24 }, ctx)
+    await actions.open({ cols: 80, rows: 24, shell: args.shell }, ctx)
     const s = session!
     s.owner = 'agent'
     grant(s, p.conversation)
@@ -429,10 +443,20 @@ export const actions = {
   }),
   inspect: guarded((_args, ctx) => {
     const s = session
-    if (!s || s.ended || s.login !== ctx.device?.login || s.address !== ctx.device?.address)
+    // Expiry cleanup belongs to the timer, not this read-only query. Never
+    // disclose an expired session, even before the next timer tick.
+    if (
+      !s ||
+      s.ended ||
+      expired(s) ||
+      s.login !== ctx.device?.login ||
+      s.address !== ctx.device?.address
+    )
       return null
+    // Inspect is read-only: a passive view must not interrupt a reader.
     return {
       secretToken: s.secretToken,
+      secretReplay: s.history.toString('base64'),
       pid: s.pty.pid,
       cwd: ctx.host.projectRoot,
       cols: s.pty.cols,
