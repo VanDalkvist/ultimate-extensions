@@ -425,6 +425,9 @@ export const actions = {
     const p = pending
     if (!p || p.id !== args.requestId || p.expires <= Date.now() || (session && !session.ended))
       throw fail()
+    // Validate before consuming approval: a stale browser preference must not
+    // permanently discard a pending request without starting a shell.
+    shellForStart(args.shell, installedShells())
     pending = undefined // Consume before spawn: a repeated click cannot start another shell.
     await actions.open({ cols: 80, rows: 24, shell: args.shell }, ctx)
     const s = session!
