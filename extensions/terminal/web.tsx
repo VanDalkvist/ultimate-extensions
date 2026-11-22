@@ -75,7 +75,7 @@ const GrantAction = actionRef<{ secretToken: string; conversation: ConversationI
 )
 const Revoke = actionRef<{ secretToken: string }, Metadata>('terminal', 'revoke')
 const Approval = actionRef<{ requestId: string }, { available: boolean }>('terminal', 'approval')
-const Approve = actionRef<{ requestId: string }, Metadata & { conversation: ConversationId }>(
+const Approve = actionRef<{ requestId: string; shell: string }, Metadata & { conversation: ConversationId }>(
   'terminal',
   'approve',
 )
@@ -474,6 +474,7 @@ function TerminalSurface() {
 }
 function TerminalTool({ call }: { call: ToolCallView }) {
   const { showSurface } = useUltimate()
+  const [defaultShell] = useExtensionUiState('default-shell', 'system')
   const openTerminal = (
     <Button size="sm" variant="outline" onClick={() => showSurface('terminal')}>
       Открыть терминал
@@ -505,7 +506,7 @@ function TerminalTool({ call }: { call: ToolCallView }) {
     try {
       if (approve) {
         setCanOpen(true)
-        const result = await api.action(Approve, { requestId })
+        const result = await api.action(Approve, { requestId, shell: defaultShell })
         setChoice(`Approved · session ${result.sessionId}`)
         try {
           await api.submit(
