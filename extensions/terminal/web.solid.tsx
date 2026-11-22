@@ -91,7 +91,7 @@ function OpenShellButton() {
 
 function TerminalSurface() {
   const conversation = useConversationId()
-  const [defaultShell, setDefaultShell] = useExtensionUiState('default-shell', 'system')
+  const [defaultShell, setDefaultShell] = useExtensionUiState<string>('default-shell', 'system')
   const detected = useAction(Shells, {})
   const shellAvailable = () => {
     const catalog = detected.data()
@@ -386,7 +386,7 @@ type TerminalDetails = {
   truncated?: boolean
 }
 function ApprovalCard(props: { requestId: string; details: TerminalDetails }) {
-  const [defaultShell] = useExtensionUiState('default-shell', 'system')
+  const [defaultShell] = useExtensionUiState<string>('default-shell', 'system')
   const available = useAction(Approval, { requestId: props.requestId }, { every: 1000 })
   const [choice, setChoice] = createSignal('')
   const [canOpen, setCanOpen] = createSignal(false)
