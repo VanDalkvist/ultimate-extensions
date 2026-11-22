@@ -7,9 +7,11 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { api } from '@/sdk'
 import {
   maxAgentSelectionBytes,
-  terminalAgentContext,
+  terminalAgentSubmission,
   terminalSelectionBytes,
 } from './terminal-agent-context.ts'
+
+type Preview = { text: string; conversation: ConversationId }
 
 export function TerminalAgentSelection({
   instance,
@@ -19,19 +21,26 @@ export function TerminalAgentSelection({
   conversation?: ConversationId
 }) {
   const cachedSelection = useRef<string | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
+  const inFlight = useRef(false)
+  const [preview, setPreview] = useState<Preview | null>(null)
   const [notice, setNotice] = useState('')
   const [sending, setSending] = useState(false)
+  const [deliveryUncertain, setDeliveryUncertain] = useState(false)
+  const destinationChanged = preview !== null && preview.conversation !== conversation
 
   function capture() {
-    // WTerm clears selection on focus leave. Capture before the button steals
-    // pointer focus; never keep a transcript or send it without a second click.
+    // Pointer focus can clear the native selection. Keyboard activation has
+    // no pointerdown, so click also has a fallback to getSelectionText().
     cachedSelection.current = instance?.getSelectionText() ?? null
   }
 
   function inspectSelection() {
     const selected = cachedSelection.current ?? instance?.getSelectionText()
     cachedSelection.current = null
+    if (conversation === undefined) {
+      setNotice('Choose a conversation first')
+      return
+    }
     if (!selected?.trim()) {
       setNotice('Select output first')
       return
@@ -41,28 +50,44 @@ export function TerminalAgentSelection({
       return
     }
     setNotice('')
-    setPreview(selected)
+    setDeliveryUncertain(false)
+    // Freezes the destination: switching conversations cannot silently
+    // redirect the selected terminal output.
+    setPreview({ text: selected, conversation })
+  }
+
+  function dismiss() {
+    if (inFlight.current) return
+    setPreview(null)
+    setNotice('')
+    setDeliveryUncertain(false)
   }
 
   async function send() {
-    if (!preview || !conversation || sending) return
-    let message: string
+    if (!preview || inFlight.current || deliveryUncertain) return
+    let prepared: ReturnType<typeof terminalAgentSubmission<ConversationId>>
     try {
-      message = terminalAgentContext(preview)
+      prepared = terminalAgentSubmission(preview, conversation)
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Invalid selection')
+      setNotice(error instanceof Error ? error.message : 'Invalid terminal selection')
       return
     }
+    // State updates are asynchronous; this lock prevents rapid double clicks
+    // from scheduling two follow-up messages.
+    inFlight.current = true
     setSending(true)
+    setNotice('')
     try {
-      // A user-confirmed follow-up to the active Ultimate conversation.
-      // This only queues the message; it does not run the selected output.
-      await api.submit(message, 'followUp', conversation)
+      await api.submit(prepared.message, 'followUp', prepared.conversation)
       setPreview(null)
       setNotice('Queued for agent')
     } catch {
-      setNotice('Could not send · preview kept')
+      // A lost response does not prove the submit was rejected. Never
+      // encourage a blind retry of potentially sensitive/duplicate text.
+      setDeliveryUncertain(true)
+      setNotice('Delivery not confirmed. Check the conversation before retrying.')
     } finally {
+      inFlight.current = false
       setSending(false)
     }
   }
@@ -71,10 +96,10 @@ export function TerminalAgentSelection({
     <>
       <div className="relative shrink-0">
         <Button
-          aria-label="Send selected terminal output to agent"
-          disabled={!instance || !conversation}
+          aria-label="Share selected terminal output with agent"
+          disabled={!instance || conversation === undefined}
           size="sm"
-          title="Review the selected output before sharing it with the active agent"
+          title="Preview selected terminal output before sharing it; no shell access is granted"
           variant="ghost"
           onPointerDown={capture}
           onClick={inspectSelection}
@@ -82,7 +107,7 @@ export function TerminalAgentSelection({
           <SendIcon className="size-3.5" />
           To agent
         </Button>
-        {notice && (
+        {notice && preview === null && (
           <span
             aria-live="polite"
             className="absolute right-0 top-full z-20 mt-1 whitespace-nowrap rounded bg-background px-2 py-1 text-[10px] text-muted-foreground shadow-sm"
@@ -95,47 +120,56 @@ export function TerminalAgentSelection({
       <Dialog
         open={preview !== null}
         onOpenChange={(open) => {
-          if (!open && !sending) {
-            setPreview(null)
-            setNotice('')
-          }
+          if (!open) dismiss()
         }}
       >
         <DialogContent>
-          <DialogTitle>Send output to agent?</DialogTitle>
+          <DialogTitle>Send selected output to agent?</DialogTitle>
           <DialogDescription>
-            Only this selected text will be sent to the active conversation.
-            Review and remove secrets before continuing. No shell command will be run.
+            Only the text below, plus a short untrusted-data label, goes to this
+            Ultimate conversation. Remove secrets before sending. This does not grant
+            the agent shell access or run a command.
           </DialogDescription>
+          <p className="font-mono text-[11px] text-muted-foreground">
+            Destination · Conversation #{preview?.conversation}
+          </p>
+          {destinationChanged && (
+            <p className="text-[12px] text-error" role="alert">
+              Active conversation changed. Close the preview and select again.
+            </p>
+          )}
           <textarea
             aria-label="Terminal output to share"
             autoCapitalize="off"
             autoComplete="off"
             className="min-h-36 max-h-72 w-full resize-y rounded-md border border-border bg-background p-3 font-mono text-[12px] text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
             spellCheck={false}
-            value={preview ?? ''}
-            onChange={(event) => setPreview(event.target.value)}
+            value={preview?.text ?? ''}
+            onChange={(event) => {
+              const text = event.target.value
+              setPreview((current) => current && { ...current, text })
+            }}
           />
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] text-muted-foreground">
-              {terminalSelectionBytes(preview ?? '')} / {maxAgentSelectionBytes} bytes
+              {terminalSelectionBytes(preview?.text ?? '')} / {maxAgentSelectionBytes} bytes
             </span>
             <div className="flex gap-2">
-              <Button
-                disabled={sending}
-                size="sm"
-                variant="outline"
-                onClick={() => { setPreview(null); setNotice('') }}
-              >
+              <Button disabled={sending} size="sm" variant="outline" onClick={dismiss}>
                 Cancel
               </Button>
               <Button
-                disabled={sending || !preview?.trim() ||
-                  terminalSelectionBytes(preview) > maxAgentSelectionBytes}
+                disabled={
+                  sending ||
+                  deliveryUncertain ||
+                  destinationChanged ||
+                  !preview?.text.trim() ||
+                  terminalSelectionBytes(preview.text) > maxAgentSelectionBytes
+                }
                 size="sm"
                 onClick={() => void send()}
               >
-                {sending ? 'Sending…' : 'Send to agent'}
+                {sending ? 'Sending…' : deliveryUncertain ? 'Check conversation' : 'Send to agent'}
               </Button>
             </div>
           </div>
