@@ -8,3 +8,9 @@
     flex-basis: 100%;
   }
 }
+
+/* WTerm controls live inside Ultimate's shared theme, but the host CSS
+   scanner cannot emit classes introduced only by this extension. */
+.terminal-find-panel {
+  width: min(22rem, calc(100vw - 2rem));
+}
