@@ -205,7 +205,13 @@ export function useFiles(root: string) {
   const files = session(root)
   const [state, setState] = createSignal(files.get())
 
-  onSettled(() => files.subscribe(() => setState(files.get())))
+  onSettled(() => {
+    const unsubscribe = files.subscribe(() => setState(files.get()))
+    // A read can finish while the component mounts; reconcile the snapshot
+    // after the listener becomes active so no loaded draft is missed.
+    setState(files.get())
+    return unsubscribe
+  })
 
   // The session survives view switches. Its timers and asynchronous writes
   // are server-backed and must not be destroyed on surface unmount.
