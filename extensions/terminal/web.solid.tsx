@@ -14,9 +14,9 @@ import {
   type SolidToolProps, type ToolCallView,
 } from '@/sdk/solid'
 import { settled } from './errors.ts'
-import { terminalViewLifecycle } from './lifecycle.tsx'
-import { readWithRetry } from './read-retry.tsx'
-import { shellLaunch, shellOpenIntent } from './shell-launch.tsx'
+import { terminalViewLifecycle } from './lifecycle.ts'
+import { readWithRetry } from './read-retry.ts'
+import { shellLaunch, shellOpenIntent } from './shell-launch.ts'
 import { TerminalFind, TerminalAgentSelection, TerminalShellPicker } from './terminal-controls.solid.tsx'
 import { TerminalEmulator } from './terminal-emulator.solid.tsx'
 import type { ShellCatalog } from './shells.ts'
