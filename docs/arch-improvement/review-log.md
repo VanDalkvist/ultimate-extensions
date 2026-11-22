@@ -286,3 +286,18 @@
 **S9 verification:** source inventory shows **one** `extensions/files/web.solid.tsx`, zero leftover non-Solid `.tsx` files in Files, no React-specific UI code in changed modules. Original pure-state tests retained and redirected to new paths. Full `pnpm install --frozen-lockfile`, TypeScript/OXC Solid compilation, Vitest, browser visual and real macOS editor/autosave/conflict/recovery **NOT RUN**. **S9 dual-circuit verdict BLOCKED — do not merge PR #8 solely on static checks.**
 
 **S10 lessons:** preserve user data/model and one-shot save protocols during a framework migration. Browser-generated state and editor focus cannot be validated with a file-naming check. Keep large high-risk changes isolated from unrelated panel upgrades and from independently maintained projects like Skyscraper.
+
+
+## Cycle 6 — 2026-11-22 — Subscription Usage fails on Ultimate 0.1 boot
+
+**User evidence:** after updating the installed Ultimate, terminal reported `Read subscription-usage/status failed` and `Automatic restart: Error: System is not ready`. Current Ultimate source and installed extension repo are the evidence; no runtime log beyond those two lines is available.
+
+**Root finding (P1, fixed):** `extensions/subscription-usage/server.ts` still called `host.onRelease()`, which is absent from current `server/extensions.ts` and the published `docs/extensions/server.md` contract. The available lifecycle is `onOpen(async opened => opened.defer(cleanup))` plus process-scoped `onClose`. The outdated call can prevent the facet from installing; a browser `status` read then fails.
+
+**Secondary finding (P2, upstream):** current Ultimate `extensions/update/server.ts` has an onLoadError auto-restart check that calls `host.system()` before `createSystem` finishes in `server/main.ts`, producing `System is not ready`. This can mask the initial failed facet. It is upstream code, not changed by this repair.
+
+**Fix:** `server.ts` uses a small pure `registerUsageLifetime` adapter: it registers `opened.defer(() => tracker.close())` before `tracker.open()`, so every core release stops pending requests before the reload-stable SQLite resource is destroyed. No network endpoint, provider auth, database schema, credentials or usage cache changed. Added `scripts/install-subscription-usage.sh` to copy the new server and Solid facet into the *installed* `~/.ultimate/extensions/subscription-usage/` and preserve modified/old files as backups. It leaves `~/.ultimate/subscription-usage.sqlite` untouched.
+
+**Verification:** 2/2 Node v22 tests exercising repeated open/dispose cycles and removal of `onRelease` pass. Both tested file Git blob SHA values match source on `main`. Current host API checked against upstream server lifecycle and startup implementation. Actual Ultimate macOS core restart, provider HTTP reads and live status-line UI **NOT RUN** from this environment.
+
+**Disposition:** fixed in main, local install script supplied. If the warning survives installed file sync, inspect earlier facet load failures (the update auto-restart warning is downstream) rather than treating it as a Usage quota/credential problem.
