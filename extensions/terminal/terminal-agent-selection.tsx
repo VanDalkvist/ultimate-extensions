@@ -142,7 +142,7 @@ export function TerminalAgentSelection({
             aria-label="Terminal output to share"
             autoCapitalize="off"
             autoComplete="off"
-            className="min-h-36 max-h-72 w-full resize-y rounded-md border border-border bg-background p-3 font-mono text-[12px] text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="terminal-agent-preview min-h-36 max-h-72 w-full resize-y rounded-md border border-border bg-background p-3 font-mono text-[12px] text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
             spellCheck={false}
             value={preview?.text ?? ''}
             onChange={(event) => {
