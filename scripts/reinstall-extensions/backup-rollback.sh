@@ -30,7 +30,7 @@ list_backups() {
 
 validate_rollback_manifest() {
   local backup="$1" project_root="$2" scope ext state target before scope_backup
-  awk -F '\\t' '
+  awk -F '\t' '
     NF != 3 { exit 1 }
     $1 !~ /^(global|project)$/ { exit 1 }
     $2 !~ /^(files|right-panel-resize|subscription-usage|terminal|themes|vpn)$/ { exit 1 }
@@ -39,7 +39,7 @@ validate_rollback_manifest() {
     END { if (NR == 0) exit 1 }
   ' "$backup/manifest.tsv" || fail "Backup manifest is malformed or contains duplicate/unknown entries"
 
-  while IFS=$'\\t' read -r scope ext state; do
+  while IFS=$'\t' read -r scope ext state; do
     if [[ "$scope" == "global" ]]; then
       target="$GLOBAL_ROOT/$ext"
     else
@@ -75,6 +75,8 @@ rollback_snapshot() {
   [[ "$id" == "latest" || "$id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || fail "Invalid backup ID"
   [[ ! -L "$backup" ]] || fail "Backup path is a symlink; inspect it manually"
   [[ -d "$backup" && -f "$backup/manifest.tsv" ]] || fail "Backup not found: $id"
+  [[ ! -L "$backup/manifest.tsv" && ! -L "$backup/project-root.txt" ]] ||
+    fail "Backup metadata contains a symlink; inspect it manually"
   [[ ! -f "$backup/ROLLED_BACK" ]] || fail "Backup was already rolled back: ${backup##*/}"
 
   local project_root=""
@@ -87,8 +89,8 @@ rollback_snapshot() {
       fail "Project .ultimate/extensions or backup root became a symlink"
     [[ -n "$project_root" && -d "$project_root" ]] ||
       fail "Original project root is missing; restore it first: $project_root"
-    [[ -d "$project_root/.ultimate/.extension-backups/${backup##*/}" ]] ||
-      fail "Project backup payload is missing under $project_root/.ultimate/.extension-backups"
+    [[ -d "$project_root/.ultimate/.extension-backups/${backup##*/}" && ! -L "$project_root/.ultimate/.extension-backups/${backup##*/}" ]] ||
+      fail "Project backup payload is missing or linked under $project_root/.ultimate/.extension-backups"
   fi
 
   validate_rollback_manifest "$backup" "$project_root"
