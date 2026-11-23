@@ -25,3 +25,13 @@ export function gateRouteActive(
 ): boolean {
   return mode === 'rule' && selected === expected
 }
+
+export function aiRouteActive(
+  mode: Mode | null | undefined,
+  gateSelected: string | null | undefined,
+  selectedNode: string | null | undefined,
+  availableNodes: string[] | undefined,
+): boolean {
+  return gateRouteActive(mode, gateSelected, 'AI-NODES') &&
+    !!selectedNode && !!availableNodes?.includes(selectedNode)
+}
