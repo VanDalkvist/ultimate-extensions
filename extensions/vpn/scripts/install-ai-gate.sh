@@ -65,6 +65,7 @@ cp "$CONFIG" "$YAML_TMP"
     map(
       if .name == "PROXY" then
         .proxies = ((.proxies // []) | map(select(. != "DIRECT" and . != "REJECT" and . != "REJECT-DROP")))
+        | .["empty-fallback"] = "REJECT"
         | del(.now)
       else .
       end
@@ -75,6 +76,7 @@ cp "$CONFIG" "$YAML_TMP"
       {"name":"AI-GATE","type":"select","proxies":["PROXY","REJECT"]}
     ]
   )
+  | .mode = "rule"
   | .rule-providers."ai-services" = {
       "type":"file",
       "behavior":"classical",
