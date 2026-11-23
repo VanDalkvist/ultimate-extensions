@@ -83,11 +83,7 @@ rollback_snapshot() {
     after="$scope_backup/after/$scope/$ext"
 
     if [[ "$state" == "present" && ! -d "$before" ]]; then
-      if [[ -e "$target" || -L "$target" ]]; then
-        info "unchanged" "$target was not moved before the failed install"
-        continue
-      fi
-      fail "Backup payload is missing for $scope/$ext and the original target is absent"
+      fail "Backup payload is missing for $scope/$ext; refusing to guess which version is installed"
     fi
     if [[ -e "$target" || -L "$target" ]]; then
       mkdir -p "$(dirname "$after")"
