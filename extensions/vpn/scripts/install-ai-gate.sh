@@ -115,28 +115,13 @@ curl -fsS --max-time 5 "$API/version" >/dev/null || fail "Mihomo API is unavaila
   fail "PROXY must reference one or more subscription providers under use"
 LAST_RULE="$("$YQ" -r '.rules[-1] // ""' "$CONFIG")"
 [[ "$LAST_RULE" == MATCH,* ]] || fail "The final rule must be MATCH,...; refusing to reorder an unknown rule set"
-for group in GENERAL-GATE AI-GATE; do
+for group in GENERAL-GATE AI-GATE AI-NODES; do
   COUNT="$("$YQ" -r "[.proxy-groups[]? | select(.name == \"$group\")] | length" "$CONFIG")"
-  if [[ "$COUNT" != "0" ]]; then
-    if [[ "$group" == "GENERAL-GATE" ]]; then
-      "$YQ" -e '.proxy-groups[] | select(.name == "GENERAL-GATE" and .type == "select" and .proxies == ["PROXY", "DIRECT"])' "$CONFIG" >/dev/null ||
-        fail "A different group already uses GENERAL-GATE; rename it manually before installing"
-    else
-      "$YQ" -e '.proxy-groups[] | select(.name == "AI-GATE" and .type == "select" and .proxies == ["AI-NODES", "REJECT"])' "$CONFIG" >/dev/null ||
-        fail "A different group already uses AI-GATE; rename it manually before installing"
-    fi
-  fi
+  [[ "$COUNT" == "0" ]] || fail "$group already exists. Use the printed rollback command before reinstalling AI Gate."
 done
-AI_NODES_EXISTS="$("$YQ" -r '[.proxy-groups[]? | select(.name == "AI-NODES")] | length' "$CONFIG")"
-if [[ "$AI_NODES_EXISTS" != "0" ]]; then
-  "$YQ" -e '(.proxy-groups[] | select(.name == "AI-NODES" and .type == "select" and .["empty-fallback"] == "REJECT") | .use) == (.proxy-groups[] | select(.name == "PROXY") | .use)' "$CONFIG" >/dev/null ||
-    fail "A different group already uses AI-NODES; rename it manually before installing"
-fi
-PROVIDER_EXISTS="$("$YQ" -r '.["rule-providers"] // {} | has("ultimate-ai-services")' "$CONFIG")"
-if [[ "$PROVIDER_EXISTS" == "true" ]]; then
-  "$YQ" -e '.["rule-providers"]["ultimate-ai-services"] == {"type":"file","behavior":"classical","format":"text","path":"./rules/ultimate-ai-services.list"}' "$CONFIG" >/dev/null ||
-    fail "A different rule-provider already uses the name ultimate-ai-services"
-fi
+PROVIDER_EXISTS="$("$YQ" -r '.[\"rule-providers\"] // {} | has(\"ultimate-ai-services\")' "$CONFIG")"
+[[ "$PROVIDER_EXISTS" == "false" ]] || fail "ultimate-ai-services rule provider already exists. Roll back the previous AI Gate install first."
+
 STAMP="$(date '+%Y%m%d-%H%M%S')-$$-$RANDOM"
 mkdir -p "$BACKUP_ROOT" "$RULE_DIR"
 BACKUP_DIR="$BACKUP_ROOT/$STAMP"
