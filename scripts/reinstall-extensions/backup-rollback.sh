@@ -54,8 +54,8 @@ validate_rollback_manifest() {
     [[ ! -L "$target" ]] || fail "Rollback target became a symlink: $target"
     [[ ! -L "$before" ]] || fail "Rollback backup entry is a symlink: $before"
     [[ ! -e "$after" && ! -L "$after" ]] || fail "Rollback after-path already exists: $after"
-    if [[ "$state" == "present" ]]; then
-      [[ -d "$before" ]] || fail "Backup payload is missing for $scope/$ext"
+    if [[ "$state" == "present" && ! -d "$before" && ! -d "$target" ]]; then
+      fail "Neither the original target nor its backup exists for $scope/$ext"
     fi
   done < "$backup/manifest.tsv"
 }
@@ -121,7 +121,8 @@ rollback_snapshot() {
     after="$scope_backup/after/$scope/$ext"
 
     if [[ "$state" == "present" && ! -d "$before" ]]; then
-      fail "Backup payload is missing for $scope/$ext; refusing to guess which version is installed"
+      info "unchanged" "$target still contains its original folder; it was not moved before the failed deployment"
+      continue
     fi
     if [[ -e "$target" || -L "$target" ]]; then
       mkdir -p "$(dirname "$after")"
