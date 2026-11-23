@@ -6,7 +6,7 @@ export const SECOND = '🇩🇪 Germany — #2'
 
 export async function fixture() {
   const state = {
-    mode: 'rule', selected: NODE, general: 'PROXY', ai: 'PROXY',
+    mode: 'rule', selected: NODE, aiNode: NODE, general: 'PROXY', ai: 'AI-NODES',
     failure: '', failureMethod: '', failureCode: 503, malformed: false, empty: false,
     calls: [] as { method: string; path: string; body: unknown }[],
   }
@@ -17,7 +17,7 @@ export async function fixture() {
     const body = text ? JSON.parse(text) : null
     res.setHeader('content-type', 'application/json')
     if (path === '/__test') {
-      if (req.method === 'POST') for (const key of ['mode', 'selected', 'general', 'ai', 'failure', 'failureMethod', 'failureCode', 'malformed', 'empty'] as const)
+      if (req.method === 'POST') for (const key of ['mode', 'selected', 'aiNode', 'general', 'ai', 'failure', 'failureMethod', 'failureCode', 'malformed', 'empty'] as const)
         if (key in body) Object.assign(state, { [key]: body[key] })
       res.end(JSON.stringify(state)); return
     }
@@ -26,6 +26,7 @@ export async function fixture() {
     if (path === '/version') { res.end(JSON.stringify({ version: '1.19.34' })); return }
     if (path === '/configs' && req.method === 'PATCH') state.mode = body.mode
     if (path === '/proxies/PROXY' && req.method === 'PUT') state.selected = body.name
+    if (path === '/proxies/AI-NODES' && req.method === 'PUT') state.aiNode = body.name
     if (path === '/proxies/GENERAL-GATE' && req.method === 'PUT') state.general = body.name
     if (path === '/proxies/AI-GATE' && req.method === 'PUT') state.ai = body.name
     if (req.method !== 'GET') { res.writeHead(204).end(); return }
@@ -34,7 +35,8 @@ export async function fixture() {
       '/proxies': { proxies: {
         PROXY: { type: 'Selector', now: state.selected, all: [NODE, SECOND] },
         'GENERAL-GATE': { type: 'Selector', now: state.general, all: ['PROXY', 'DIRECT'] },
-        'AI-GATE': { type: 'Selector', now: state.ai, all: ['PROXY', 'REJECT'] },
+        'AI-GATE': { type: 'Selector', now: state.ai, all: ['AI-NODES', 'REJECT'] },
+        'AI-NODES': { type: 'Selector', now: state.aiNode, all: [NODE, SECOND] },
       } },
       '/providers/proxies': { providers: {
         personal: { name: 'Personal', vehicleType: 'HTTP', url: 'private-subscription', proxies: [
