@@ -6,7 +6,8 @@ export type Node = { name: string; type: string; delay: number | null }
 export type Provider = { id: string; name: string; nodes: Node[] }
 export const GENERAL_GATE = 'GENERAL-GATE' as const
 export const AI_GATE = 'AI-GATE' as const
-export type GateName = typeof GENERAL_GATE | typeof AI_GATE
+export const AI_NODES = 'AI-NODES' as const
+export type GateName = typeof GENERAL_GATE | typeof AI_GATE | typeof AI_NODES
 export type GateState = { selected: string | null; options: string[] }
 export type Snapshot = {
   issue: Issue | null
@@ -20,13 +21,16 @@ export type Snapshot = {
   providers: Provider[]
   generalGate: GateState | null
   aiGate: GateState | null
+  aiNodes: GateState | null
+  aiProxy: string | null
 }
 export type Context = { signal: AbortSignal }
 export type VpnPort = {
   read(signal: AbortSignal): Promise<Snapshot>
   select(name: string, signal: AbortSignal): Promise<void>
   setMode(mode: 'rule' | 'direct', signal: AbortSignal): Promise<void>
-  setGate(group: GateName, selected: 'PROXY' | 'DIRECT' | 'REJECT', signal: AbortSignal): Promise<void>
+  setGate(group: typeof GENERAL_GATE | typeof AI_GATE, selected: 'PROXY' | 'DIRECT' | 'REJECT' | 'AI-NODES', signal: AbortSignal): Promise<void>
+  selectAiNode(name: string, signal: AbortSignal): Promise<void>
   probe(signal: AbortSignal): Promise<Record<string, number | null>>
 }
 
