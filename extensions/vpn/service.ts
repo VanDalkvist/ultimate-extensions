@@ -20,6 +20,8 @@ export class VpnService {
     // Rule mode is required for the independent traffic gates to take effect.
     await this.ensureRuleMode(before, signal)
     await this.port.select(name, signal)
+    // Mirror provider nodes into the AI-only group. Static proxies stay out of AI routing.
+    if (before.aiNodes?.options.includes(name)) await this.port.selectAiNode(name, signal)
     // Selecting a server is an explicit request to turn general VPN routing on.
     if (before.generalGate?.selected === 'DIRECT')
       await this.port.setGate(GENERAL_GATE, 'PROXY', signal)
@@ -27,6 +29,8 @@ export class VpnService {
     const after = await this.port.read(signal)
     if (after.activeProxy !== name || after.mode !== 'rule')
       throw new VpnError('conflict', 'Mihomo не подтвердил выбор сервера и режима Rule. Обновите состояние.')
+    if (after.aiNodes?.options.includes(name) && after.aiProxy !== name)
+      throw new VpnError('conflict', 'AI-NODES не подтвердил выбор VPN-узла. Обновите состояние.')
     return after
   }
 
@@ -50,15 +54,15 @@ export class VpnService {
   async aiPower(enabled: boolean, signal: AbortSignal): Promise<Snapshot> {
     const before = await this.port.read(signal)
     const gate = before.aiGate
-    if (!gate || !gate.options.includes(enabled ? 'PROXY' : 'REJECT'))
+    if (!gate || !gate.options.includes(enabled ? 'AI-NODES' : 'REJECT'))
       throw new VpnError('invalid', 'Группа AI-GATE не настроена. Запустите установочный скрипт AI Gate.')
-    if (enabled && !before.providers.some(p => p.nodes.some(n => n.name === before.activeProxy)))
-      throw new VpnError('invalid', 'Сначала выберите сервер VPN')
+    if (enabled && (!before.aiNodes?.selected || !before.aiNodes.options.includes(before.aiNodes.selected)))
+      throw new VpnError('invalid', 'Сначала выберите VPN-узел из подписки для AI-трафика')
 
     // A legacy client may have set global mode=direct. Restore rule mode before
     // opening or closing the AI route so the AI-GATE rule is actually enforced.
     await this.ensureRuleMode(before, signal)
-    const target = enabled ? 'PROXY' : 'REJECT'
+    const target = enabled ? 'AI-NODES' : 'REJECT'
     await this.port.setGate(AI_GATE, target, signal)
     const after = await this.port.read(signal)
     if (after.mode !== 'rule' || after.aiGate?.selected !== target)
