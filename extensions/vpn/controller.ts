@@ -30,7 +30,7 @@ export function createController(connection: () => Promise<Connection>, fetcher:
           : { code: 'api' as const, message: 'Не удалось прочитать состояние VPN' }
         return {
           issue, enabled: false, mode: null, activeProxy: null, activeDelay: null,
-          version: null, group: '', providers: [], generalGate: null, aiGate: null,
+          version: null, group: '', providers: [], generalGate: null, aiGate: null, aiNodes: null, aiProxy: null,
         }
       }
     },
