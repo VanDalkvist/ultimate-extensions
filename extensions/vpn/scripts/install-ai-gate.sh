@@ -53,6 +53,7 @@ restore_live_files() {
   else
     rm -f "$RULE_FILE"
   fi
+  FILES_RESTORED=1
   local status
   status="$(api_reload)"
   if [[ "$status" != "204" ]]; then
@@ -83,6 +84,9 @@ if [[ "${1:-}" == "--rollback" ]]; then
   [[ -d "$BACKUP_DIR" && -f "$BACKUP_DIR/manifest" ]] || fail "AI Gate backup not found: $BACKUP_ID"
   [[ ! -f "$BACKUP_DIR/ROLLED_BACK" ]] || fail "This backup was already rolled back"
   [[ -f "$BACKUP_DIR/config.yaml" && -f "$BACKUP_DIR/rule-existed" ]] || fail "Backup is incomplete"
+  if [[ "$(cat "$BACKUP_DIR/rule-existed")" == "yes" ]]; then
+    [[ -f "$BACKUP_DIR/ultimate-ai-services.list" ]] || fail "Backup AI rule file is missing"
+  fi
 
   EXPECTED_CONFIG="$(awk -F= '$1=="installed_config_sha256" {print $2}' "$BACKUP_DIR/manifest")"
   EXPECTED_RULE="$(awk -F= '$1=="installed_rule_sha256" {print $2}' "$BACKUP_DIR/manifest")"
@@ -94,11 +98,18 @@ if [[ "${1:-}" == "--rollback" ]]; then
     fail "AI rule file changed since installation. Review it manually before rollback."
 
   STARTED=1
-  restore_live_files
-  date -u '+%Y-%m-%dT%H:%M:%SZ' > "$BACKUP_DIR/ROLLED_BACK"
-  COMMITTED=1
-  echo "[done] Restored original Mihomo config and AI rules from $BACKUP_DIR"
-  exit 0
+  if restore_live_files; then
+    date -u '+%Y-%m-%dT%H:%M:%SZ' > "$BACKUP_DIR/ROLLED_BACK"
+    COMMITTED=1
+    echo "[done] Restored original Mihomo config and AI rules from $BACKUP_DIR"
+    exit 0
+  fi
+  if ((FILES_RESTORED)); then
+    date -u '+%Y-%m-%dT%H:%M:%SZ' > "$BACKUP_DIR/ROLLED_BACK"
+    COMMITTED=1
+    fail "Original files are restored on disk, but Mihomo did not confirm reload. Restart Mihomo and inspect its log."
+  fi
+  fail "Rollback could not restore the original files. Backup remains at $BACKUP_DIR"
 fi
 
 [[ $# -eq 0 ]] || fail "Usage: $0 [--rollback <backup-id>]"
@@ -201,7 +212,7 @@ RULES
 ' "$YAML_TMP"
 
 # Preserve original file mode after yq writes the staged YAML.
-chmod "$(stat -f '%Lp' "$CONFIG")" "$YAML_TMP"
+chmod 600 "$YAML_TMP"
 
 "$YQ" -e '.mode == "rule"' "$YAML_TMP" >/dev/null || fail "Staged config is not in rule mode"
 "$YQ" -e '.rules[0] == "RULE-SET,ultimate-ai-services,AI-GATE"' "$YAML_TMP" >/dev/null || fail "AI rule is not first"
