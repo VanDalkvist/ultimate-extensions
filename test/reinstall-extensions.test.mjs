@@ -203,7 +203,7 @@ test('rollback keeps an unchanged target when failure happened before moving it 
   const f = fixture(t)
   const result = run(['--apply'], f.env)
   assertOk(result)
-  const backupLine = result.stdout.split('\\n').find(line => line.startsWith('[backup] '))
+  const backupLine = result.stdout.split('\n').find(line => line.startsWith('[backup] '))
   assert.ok(backupLine, result.stdout)
   const backupRoot = backupLine.slice('[backup] '.length)
   const current = join(f.ultimateHome, 'extensions', 'files')
