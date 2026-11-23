@@ -10,7 +10,7 @@ test('select from direct restores rule mode and serializes commands', async t =>
   const selected = await app.select({ node: SECOND }, ctx())
   assert.equal(selected.activeProxy, SECOND); assert.equal(selected.mode, 'rule')
   assert.deepEqual(f.state.calls.filter(c => c.method !== 'GET').map(c => [c.method,c.path,c.body]), [
-    ['PATCH','/configs',{mode:'rule'}], ['PUT','/proxies/PROXY',{name: SECOND}],
+    ['PATCH','/configs',{mode:'rule'}], ['PUT','/proxies/PROXY',{name: SECOND}], ['PUT','/proxies/AI-NODES',{name: SECOND}],
   ])
   await app.power({enabled:false},ctx())
   assert.equal(f.state.mode, 'rule'); assert.equal(f.state.general, 'DIRECT')
@@ -97,4 +97,13 @@ test('provider node selection mirrors into AI-NODES; static proxy selection does
   assert.equal(after.activeProxy, SECOND)
   assert.equal(after.aiProxy, SECOND)
   assert.ok(f.state.calls.some(c => c.method === 'PUT' && c.path === '/proxies/AI-NODES' && (c.body as {name:string}).name === SECOND))
+})
+
+test('selecting static shopproxy never changes the dedicated subscription-only AI node', async t => {
+  const f = await fixture(); t.after(() => f.close())
+  const app = createController(async () => ({ baseUrl: f.url, secret: '', group: 'PROXY' }), fetch)
+  const after = await app.select({ node: 'shopproxy' }, ctx())
+  assert.equal(after.activeProxy, 'shopproxy')
+  assert.equal(after.aiProxy, NODE)
+  assert.ok(!f.state.calls.some(c => c.method === 'PUT' && c.path === '/proxies/AI-NODES' && (c.body as {name:string}).name === 'shopproxy'))
 })
