@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync, lstatSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync, existsSync, lstatSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -197,4 +197,22 @@ test('symlinked global extension root aborts before deployment', t => {
   assert.equal(readFileSync(join(external, 'sentinel.txt'), 'utf8'), 'external-data')
   assert.equal(readFileSync(join(moved, 'sentinel.txt'), 'utf8'), 'original-data')
   assert.equal(existsSync(join(f.ultimateHome, '.extension-backups')), false)
+})
+
+test('rollback keeps an unchanged target when failure happened before moving it to backup', t => {
+  const f = fixture(t)
+  const result = run(['--apply'], f.env)
+  assertOk(result)
+  const backupLine = result.stdout.split('\\n').find(line => line.startsWith('[backup] '))
+  assert.ok(backupLine, result.stdout)
+  const backupRoot = backupLine.slice('[backup] '.length)
+  const current = join(f.ultimateHome, 'extensions', 'files')
+  const original = join(backupRoot, 'before', 'global', 'files')
+  rmSync(current, { recursive: true, force: true })
+  renameSync(original, current)
+
+  const rollback = run(['--rollback', backupRoot.split('/').at(-1)], f.env)
+  assertOk(rollback)
+  assert.equal(readFileSync(join(current, 'old-install.txt'), 'utf8'), 'old-user-files')
+  assert.equal(readFileSync(join(f.ultimateHome, 'extensions', 'terminal', 'old-install.txt'), 'utf8'), 'old-user-terminal')
 })
