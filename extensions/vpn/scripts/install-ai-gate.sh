@@ -191,7 +191,7 @@ PROXY_USE="$PROXY_USE" "$YQ" -i '
     )
     | map(select(.name != "AI-NODES" and .name != "GENERAL-GATE" and .name != "AI-GATE"))
     + [
-      {"name":"AI-NODES","type":"select","use":env(PROXY_USE),"empty-fallback":"REJECT"},
+      {"name":"AI-NODES","type":"select","use":$proxy_use,"empty-fallback":"REJECT"},
       {"name":"GENERAL-GATE","type":"select","proxies":["PROXY","DIRECT"]},
       {"name":"AI-GATE","type":"select","proxies":["AI-NODES","REJECT"]}
     ]
