@@ -17,3 +17,11 @@ export function canOpenDashboard(value: string | null | undefined, browserHost: 
     return !isLoopbackHost(url.hostname) || isLoopbackHost(browserHost)
   } catch { return false }
 }
+
+export function gateRouteActive(
+  mode: Mode | null | undefined,
+  selected: string | null | undefined,
+  expected: string,
+): boolean {
+  return mode === 'rule' && selected === expected
+}
