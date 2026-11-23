@@ -430,3 +430,6 @@ The execution environment used for the GitHub source edits did not provide the u
 - Collection rollback now validates the complete manifest, every extension name/scope/state, duplicate records, backup payloads, target symlinks and after-paths before moving the first installed extension. This prevents a later malformed row from causing a partial rollback.
 - Added filesystem test cases for multi-row manifest corruption and a symlinked global extensions root. These tests are authored but still not executed in this environment.
 
+
+- Added an explicit recovery case for a deployment row written before the previous folder is moved: if the prior target still exists and the backup payload is absent, rollback preserves that target and continues restoring the other rows. If both target and backup payload are absent, rollback fails closed. A regression test simulates this pending-move state.
+- Validation remains source-level only: shell syntax, Node tests, VPN tests/typecheck and macOS live acceptance have not run because this tool session cannot reach the user's checkout or resolve GitHub from the local container.
