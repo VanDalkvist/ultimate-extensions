@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Reinstall all Ultimate extensions shipped by this repository.
-# Default mode is dry-run. Use --apply to stage, back up and atomically swap copies.
+# Default mode is dry-run. Use --apply to stage, back up and swap copies.
 set -Eeuo pipefail
 umask 077
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 ULTIMATE_HOME="${ULTIMATE_HOME:-$HOME/.ultimate}"
 GLOBAL_ROOT="$ULTIMATE_HOME/extensions"
-BACKUP_ROOT="$ULTIMATE_HOME/extension-backups"
+BACKUP_ROOT="$ULTIMATE_HOME/.extension-backups"
 PROJECT_ROOT=""
 ULTIMATE_ROOT="${ULTIMATE_ROOT:-}"
 MODE="dry-run"
@@ -61,12 +61,10 @@ done
 copy_tree() {
   local source="$1" target="$2"
   mkdir -p "$(dirname "$target")"
-  if command -v rsync >/dev/null 2>&1; then
-    mkdir -p "$target"
-    rsync -a --exclude='/node_modules/' "$source/" "$target/"
-  else
+  command -v rsync >/dev/null 2>&1 ||
     fail "rsync is required to copy extension folders while excluding native node_modules"
-  fi
+  mkdir -p "$target"
+  rsync -a --exclude='/node_modules/' "$source/" "$target/"
 }
 
 resolved_link_target() {
@@ -161,6 +159,17 @@ verify_staged_extension() {
   esac
 }
 
+scope_backup_path() {
+  local backup="$1" scope="$2"
+  if [[ "$scope" == "global" ]]; then
+    printf '%s' "$backup"
+  else
+    local root
+    root="$(cat "$backup/project-root.txt")"
+    printf '%s' "$root/.ultimate/.extension-backups/${backup##*/}"
+  fi
+}
+
 list_backups() {
   if [[ ! -d "$BACKUP_ROOT" ]]; then
     info "empty" "No extension backups found"
@@ -176,13 +185,12 @@ list_backups() {
   ((found)) || info "empty" "No available extension backups"
 }
 
-backup_path() { printf '%s' "$BACKUP_ROOT/$1"; }
-
 rollback_snapshot() {
   local id="$1" backup
   if [[ "$id" == "latest" ]]; then
     local candidate=""
     if [[ -d "$BACKUP_ROOT" ]]; then
+      local path
       for path in "$BACKUP_ROOT"/*; do
         [[ -d "$path" && -f "$path/manifest.tsv" && ! -f "$path/ROLLED_BACK" ]] || continue
         if [[ -z "$candidate" || "${path##*/}" > "${candidate##*/}" ]]; then candidate="$path"; fi
@@ -191,7 +199,7 @@ rollback_snapshot() {
     [[ -n "$candidate" ]] || fail "No available extension backup to restore"
     backup="$candidate"
   else
-    backup="$(backup_path "$id")"
+    backup="$BACKUP_ROOT/$id"
   fi
   [[ -d "$backup" && -f "$backup/manifest.tsv" ]] || fail "Backup not found: $id"
   [[ ! -f "$backup/ROLLED_BACK" ]] || fail "Backup was already rolled back: ${backup##*/}"
@@ -201,12 +209,14 @@ rollback_snapshot() {
   if grep -q '^project[[:space:]]' "$backup/manifest.tsv"; then
     [[ -n "$project_root" && -d "$project_root" ]] ||
       fail "Original project root is missing; restore it first: $project_root"
+    [[ -d "$project_root/.ultimate/.extension-backups/${backup##*/}" ]] ||
+      fail "Project backup payload is missing under $project_root/.ultimate/.extension-backups"
   fi
 
   info "rollback" "Restoring ${backup##*/}"
   while IFS=$'\t' read -r scope ext state; do
     [[ -n "$scope" && -n "$ext" && -n "$state" ]] || continue
-    local target before after
+    local target before after scope_backup
     if [[ "$scope" == "global" ]]; then
       target="$GLOBAL_ROOT/$ext"
     elif [[ "$scope" == "project" ]]; then
@@ -214,8 +224,9 @@ rollback_snapshot() {
     else
       fail "Invalid backup manifest scope: $scope"
     fi
-    before="$backup/before/$scope/$ext"
-    after="$backup/after/$scope/$ext"
+    scope_backup="$(scope_backup_path "$backup" "$scope")"
+    before="$scope_backup/before/$scope/$ext"
+    after="$scope_backup/after/$scope/$ext"
 
     if [[ "$state" == "present" && ! -d "$before" ]]; then
       if [[ -e "$target" || -L "$target" ]]; then
@@ -237,7 +248,10 @@ rollback_snapshot() {
     info "restored" "$target"
   done < "$backup/manifest.tsv"
   date -u '+%Y-%m-%dT%H:%M:%SZ' > "$backup/ROLLED_BACK"
-  info "done" "Rollback complete. Newly installed copies are retained under $backup/after"
+  if [[ -n "$project_root" ]]; then
+    date -u '+%Y-%m-%dT%H:%M:%SZ' > "$project_root/.ultimate/.extension-backups/${backup##*/}/ROLLED_BACK"
+  fi
+  info "done" "Rollback complete. Newly installed copies are retained under $backup/after and the project backup's after/ folder."
 }
 
 if [[ "$MODE" == "list" ]]; then list_backups; exit 0; fi
@@ -301,22 +315,33 @@ if [[ "$MODE" == "dry-run" ]]; then
   exit 0
 fi
 
-mkdir -p "$GLOBAL_ROOT" "$BACKUP_ROOT"
+mkdir -p "$ULTIMATE_HOME" "$BACKUP_ROOT"
 STAMP="$(date '+%Y%m%d-%H%M%S')-$$-$RANDOM"
 BACKUP="$BACKUP_ROOT/$STAMP"
-mkdir -p "$BACKUP/before" "$BACKUP/after"
+mkdir -p "$BACKUP/before/global" "$BACKUP/after/global"
 : > "$BACKUP/manifest.tsv"
-[[ -z "$PROJECT_ROOT" ]] || printf '%s\n' "$PROJECT_ROOT" > "$BACKUP/project-root.txt"
+if [[ -n "$PROJECT_ROOT" ]] && printf '%s\n' "$PROJECT_ROOT" > "$BACKUP/project-root.txt"; then
+  mkdir -p "$PROJECT_ROOT/.ultimate/.extension-backups/$STAMP/before/project"
+  mkdir -p "$PROJECT_ROOT/.ultimate/.extension-backups/$STAMP/after/project"
+fi
 
-STAGE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/ultimate-extensions-stage.XXXXXX")"
-cleanup() { rm -rf "$STAGE_ROOT"; }
+GLOBAL_STAGE_ROOT="$(mktemp -d "$ULTIMATE_HOME/.extension-stage.XXXXXX")"
+PROJECT_STAGE_ROOT=""
+if [[ -n "$PROJECT_ROOT" ]] && [[ -d "$PROJECT_ROOT/.ultimate/extensions" ]]; then
+  PROJECT_STAGE_ROOT="$(mktemp -d "$PROJECT_ROOT/.ultimate/.extension-stage.XXXXXX")"
+fi
+cleanup() {
+  rm -rf "$GLOBAL_STAGE_ROOT"
+  [[ -z "$PROJECT_STAGE_ROOT" ]] || rm -rf "$PROJECT_STAGE_ROOT"
+}
 trap cleanup EXIT
 
 for i in "${!TARGET_PATHS[@]}"; do
+  scope="${TARGET_SCOPES[$i]}"
   ext="${TARGET_NAMES[$i]}"
   target="${TARGET_PATHS[$i]}"
-  staged="$STAGE_ROOT/${TARGET_SCOPES[$i]}/$ext"
-  mkdir -p "$(dirname "$staged")"
+  if [[ "$scope" == "global" ]]; then stage_base="$GLOBAL_STAGE_ROOT"; else stage_base="$PROJECT_STAGE_ROOT"; fi
+  staged="$stage_base/$ext"
   copy_tree "$(source_path "$ext")" "$staged"
   preserve_runtime_dependencies "$ext" "$target" "$staged"
   verify_staged_extension "$ext" "$staged"
@@ -338,13 +363,18 @@ for i in "${!TARGET_PATHS[@]}"; do
   scope="${TARGET_SCOPES[$i]}"
   ext="${TARGET_NAMES[$i]}"
   target="${TARGET_PATHS[$i]}"
-  staged="$STAGE_ROOT/$scope/$ext"
+  if [[ "$scope" == "global" ]]; then
+    stage_base="$GLOBAL_STAGE_ROOT"; scope_backup="$BACKUP"
+  else
+    stage_base="$PROJECT_STAGE_ROOT"; scope_backup="$PROJECT_ROOT/.ultimate/.extension-backups/$STAMP"
+  fi
+  staged="$stage_base/$ext"
   if [[ -d "$target" ]]; then state="present"; else state="absent"; fi
   printf '%s\t%s\t%s\n' "$scope" "$ext" "$state" >> "$BACKUP/manifest.tsv"
   CHANGED=1
   if [[ "$state" == "present" ]]; then
-    mkdir -p "$BACKUP/before/$scope"
-    mv "$target" "$BACKUP/before/$scope/$ext"
+    mkdir -p "$scope_backup/before/$scope"
+    mv "$target" "$scope_backup/before/$scope/$ext"
   else
     mkdir -p "$(dirname "$target")"
   fi
@@ -356,4 +386,4 @@ trap - ERR
 info "done" "All selected extensions installed."
 info "backup" "$BACKUP"
 info "rollback" "bash scripts/reinstall-extensions.sh --rollback $STAMP"
-info "next" "Reload Ultimate. Native Terminal sessions should be stopped before replacing its installed folder."
+info "next" "Reload Ultimate. Stop active Terminal shells before replacing the installed Terminal folder."
