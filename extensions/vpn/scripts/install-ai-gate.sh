@@ -15,8 +15,8 @@ fi
 if ! "$YQ" --version | grep -Eq 'version v?4\.'; then
   echo "Mike Farah yq v4 is required." >&2; exit 1
 fi
-if ! grep -qE '^  - name: PROXY$|^- name: PROXY$' "$CONFIG"; then
-  echo "Could not find PROXY group in $CONFIG. No changes made." >&2; exit 1
+if ! "$YQ" -e '.proxy-groups[] | select(.name == "PROXY" and .type == "select")' "$CONFIG" >/dev/null; then
+  echo "Could not find a manual PROXY selector in $CONFIG. No changes made." >&2; exit 1
 fi
 if ! curl -fsS "$API/version" >/dev/null; then
   echo "Mihomo API is unavailable at $API. Start Mihomo before installing." >&2; exit 1
@@ -66,7 +66,7 @@ cp "$CONFIG" "$YAML_TMP"
       if .name == "PROXY" then
         .proxies = ((.proxies // []) | map(select(. != "DIRECT" and . != "REJECT" and . != "REJECT-DROP")))
         | .["empty-fallback"] = "REJECT"
-        | del(.now)
+        | (if .now == "DIRECT" then del(.now) else . end)
       else .
       end
     )
