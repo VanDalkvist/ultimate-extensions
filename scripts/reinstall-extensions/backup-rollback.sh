@@ -43,11 +43,15 @@ rollback_snapshot() {
   else
     backup="$BACKUP_ROOT/$id"
   fi
+  [[ "$id" == "latest" || "$id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || fail "Invalid backup ID"
   [[ -d "$backup" && -f "$backup/manifest.tsv" ]] || fail "Backup not found: $id"
   [[ ! -f "$backup/ROLLED_BACK" ]] || fail "Backup was already rolled back: ${backup##*/}"
 
   local project_root=""
   [[ ! -f "$backup/project-root.txt" ]] || project_root="$(cat "$backup/project-root.txt")"
+  if [[ -n "$project_root" ]]; then
+    [[ "$project_root" == /* && "$project_root" != "/" ]] || fail "Invalid project root in backup metadata"
+  fi
   if grep -q '^project[[:space:]]' "$backup/manifest.tsv"; then
     [[ -n "$project_root" && -d "$project_root" ]] ||
       fail "Original project root is missing; restore it first: $project_root"
@@ -58,6 +62,14 @@ rollback_snapshot() {
   info "rollback" "Restoring ${backup##*/}"
   while IFS=$'\t' read -r scope ext state; do
     [[ -n "$scope" && -n "$ext" && -n "$state" ]] || continue
+    case "$ext" in
+      files|right-panel-resize|subscription-usage|terminal|themes|vpn) ;;
+      *) fail "Invalid extension name in backup manifest: $ext" ;;
+    esac
+    case "$state" in
+      present|absent) ;;
+      *) fail "Invalid backup state for $ext: $state" ;;
+    esac
     local target before after scope_backup
     if [[ "$scope" == "global" ]]; then
       target="$GLOBAL_ROOT/$ext"
