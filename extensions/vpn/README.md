@@ -27,7 +27,8 @@ When copying rather than linking, initialize the dependency first and include de
 Optional MIHOMO_API_URL, MIHOMO_API_SECRET and MIHOMO_PROXY_GROUP live only in ~/Projects/.env on the Ultimate server. The same file supports MIHOMO_CONFIG_PATH (absolute YAML path), MIHOMO_EDITOR (one executable/app name, never a shell command string), and MIHOMO_DASHBOARD_URL (explicit browser-facing HTTPS URL, or loopback HTTP; no credentials/query/hash). YAML defaults detect ARM/Intel Homebrew on macOS and ~/.config/mihomo on Linux/Windows, including an existing Linux XDG path. URL is restricted to loopback HTTP, without path, URL credentials, query or fragment. Secrets stay server-side; files are never served to the browser.
 Click the shield or run VPN… in the command palette. Server choice is manual. The current branch adds separate selectors:
 - GENERAL-GATE: PROXY or DIRECT for ordinary traffic.
-- AI-GATE: PROXY or REJECT for AI domains.
+- AI-NODES: separate manual selector built from the same `PROXY.use` subscription providers; it excludes static proxies and DIRECT.
+- AI-GATE: AI-NODES or REJECT for AI domains.
 
 Install the matching Mihomo config before using these controls. On the user's Homebrew macOS setup:
 
@@ -40,7 +41,7 @@ sudo env \
   bash extensions/vpn/scripts/install-ai-gate.sh
 ```
 
-The script backs up the YAML and previous AI rule file in `<config-dir>/.ai-gate-backups/<id>`, removes DIRECT/REJECT options from the manual PROXY selector, sets its `empty-fallback: REJECT`, adds local AI domain rules at the **top** of the rules list, creates both gates and keeps mode=rule. It validates the temporary config with Mihomo's `-t -d <config-dir> -f <temp-config>` flags before replacing the active YAML, then reloads through the loopback API. It checks for conflicting group/provider names and refuses to overwrite them.
+The script backs up the YAML and previous AI rule file in `<config-dir>/.ai-gate-backups/<id>`, removes DIRECT/REJECT options from the manual PROXY selector, sets its `empty-fallback: REJECT`, builds AI-NODES from the existing PROXY group's `use` providers, and creates AI-GATE with only AI-NODES/REJECT. It inserts local AI domain rules at the **top** of the rules list and keeps mode=rule. Your static `shopproxy` remains available to ordinary traffic through PROXY while staying outside AI-NODES. It validates the temporary config with Mihomo's `-t -d <config-dir> -f <temp-config>` flags before replacing the active YAML, then reloads through the loopback API. It checks for conflicting group/provider names and refuses to overwrite them.
 
 The installer prints a `--rollback <id>` command. Rollback restores the original YAML and the previous AI rule file (or removes the newly created rule file when there was no previous one). It checks SHA-256 hashes first and refuses to overwrite later manual edits.
 
