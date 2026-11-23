@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")"
 CONFIG="${MIHOMO_CONFIG_PATH:-/opt/homebrew/etc/mihomo/config.yaml}"
 CONFIG_DIR="$(cd "$(dirname "$CONFIG")" 2>/dev/null && pwd -P)" || {
   echo "[error] Configuration directory does not exist: $(dirname "$CONFIG")" >&2; exit 1;
@@ -225,7 +226,7 @@ COMMITTED=1
 
 echo "[done] AI Gate installed and Mihomo reloaded."
 echo "[backup] $BACKUP_DIR"
-echo "[rollback] sudo env MIHOMO_CONFIG_PATH='$CONFIG' bash $0 --rollback '$STAMP'"
+printf '[rollback] sudo env MIHOMO_CONFIG_PATH=%q MIHOMO_API_URL=%q bash %q --rollback %q\\n' "$CONFIG" "$API" "$SCRIPT_PATH" "$STAMP"
 echo "[groups] PROXY (regular nodes + static proxies), AI-NODES (subscription providers only), GENERAL-GATE (PROXY/DIRECT), AI-GATE (AI-NODES/REJECT)"
 echo "[rules] AI domain rule inserted first; existing remaining rule order preserved."
 echo "[note] AI Gate only enforces matching rules while Mihomo is in rule mode and has a functioning route."
