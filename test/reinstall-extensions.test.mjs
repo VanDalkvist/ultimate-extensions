@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, existsSync, lstatSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync, lstatSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -140,4 +140,22 @@ test('repo-linked extension sources stay linked and a fully linked install is a 
   assertOk(result)
   assert.match(result.stdout, /nothing to copy/)
   assert.equal(existsSync(join(f.ultimateHome, '.extension-backups')), false)
+})
+
+test('rollback rejects traversal or unknown extension names in a modified manifest', t => {
+  const f = fixture(t)
+  const result = run(['--apply'], f.env)
+  assertOk(result)
+  const backupLine = result.stdout.split('\\n').find(line => line.startsWith('[backup] '))
+  assert.ok(backupLine, result.stdout)
+  const backupRoot = backupLine.slice('[backup] '.length)
+  writeFileSync(join(backupRoot, 'manifest.tsv'), 'global\\t../../victim\\tpresent\\n')
+
+  const victim = join(f.home, 'victim')
+  mkdirSync(victim)
+  writeFileSync(join(victim, 'keep.txt'), 'untouched')
+  const rollback = run(['--rollback', backupRoot.split('/').at(-1)], f.env)
+  assert.notEqual(rollback.status, 0)
+  assert.match(rollback.stderr, /Invalid extension name/)
+  assert.equal(readFileSync(join(victim, 'keep.txt'), 'utf8'), 'untouched')
 })
