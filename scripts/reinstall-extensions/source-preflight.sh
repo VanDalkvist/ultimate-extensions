@@ -38,6 +38,15 @@ preflight_special_sources() {
     fail "VPN Mihomo submodule is empty. Run: git submodule update --init --recursive"
 }
 
+preflight_target_roots() {
+  [[ ! -L "$ULTIMATE_HOME" && ! -L "$GLOBAL_ROOT" && ! -L "$BACKUP_ROOT" ]] ||
+    fail "Ultimate home, extensions root or backup root is a symlink; inspect it before deployment"
+  if [[ -n "$PROJECT_ROOT" ]]; then
+    [[ ! -L "$PROJECT_ROOT/.ultimate" && ! -L "$PROJECT_ROOT/.ultimate/extensions" && ! -L "$PROJECT_ROOT/.ultimate/.extension-backups" ]] ||
+      fail "Project .ultimate/extensions or backup root is a symlink; inspect it before deployment"
+  fi
+}
+
 preflight_target() {
   local target="$1" src="$2"
   if [[ -L "$target" ]]; then
