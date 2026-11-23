@@ -32,3 +32,12 @@ test('gate status requires global rule mode as well as the selected route', asyn
   assert.equal(gateRouteActive(null, 'PROXY', 'PROXY'), false)
   assert.equal(gateRouteActive('rule', null, 'PROXY'), false)
 })
+
+test('AI route requires a real selected option in the provider-only group', async () => {
+  const { aiRouteActive } = await import('../presentation.ts')
+  assert.equal(aiRouteActive('rule', 'AI-NODES', '🇫🇮 node', ['🇫🇮 node', '🇸🇪 node']), true)
+  assert.equal(aiRouteActive('rule', 'AI-NODES', null, ['🇫🇮 node']), false)
+  assert.equal(aiRouteActive('rule', 'AI-NODES', 'shopproxy', ['🇫🇮 node']), false)
+  assert.equal(aiRouteActive('direct', 'AI-NODES', '🇫🇮 node', ['🇫🇮 node']), false)
+  assert.equal(aiRouteActive('rule', 'REJECT', '🇫🇮 node', ['🇫🇮 node']), false)
+})
