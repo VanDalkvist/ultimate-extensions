@@ -32,24 +32,21 @@ api_reload() {
 }
 
 restore_live_files() {
-  [[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" ]] || return 0
+  [[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" ]] || return 1
   local restore_tmp=""
   if [[ -f "$BACKUP_DIR/config.yaml" ]]; then
-    restore_tmp="$(mktemp "$CONFIG_DIR/.config.ai-gate-restore.XXXXXX")"
-    cp -p "$BACKUP_DIR/config.yaml" "$restore_tmp"
-    mv -f "$restore_tmp" "$CONFIG"
+    restore_tmp="$(mktemp "$CONFIG_DIR/.config.ai-gate-restore.XXXXXX")" || return 1
+    cp -p "$BACKUP_DIR/config.yaml" "$restore_tmp" || { rm -f "$restore_tmp"; return 1; }
+    mv -f "$restore_tmp" "$CONFIG" || { rm -f "$restore_tmp"; return 1; }
   fi
-  if [[ -f "$BACKUP_DIR/rule-existed" ]] && [[ "$(cat "$BACKUP_DIR/rule-existed")" == "yes" ]]; then
-    [[ -f "$BACKUP_DIR/ultimate-ai-services.list" ]] || {
-      echo "[error] Backup rule file is missing: $BACKUP_DIR/ultimate-ai-services.list" >&2
-      return 1
-    }
-    mkdir -p "$RULE_DIR"
-    restore_tmp="$(mktemp "$RULE_DIR/.ai-gate-restore.XXXXXX")"
-    cp -p "$BACKUP_DIR/ultimate-ai-services.list" "$restore_tmp"
-    mv -f "$restore_tmp" "$RULE_FILE"
+  if [[ "$(cat "$BACKUP_DIR/rule-existed")" == "yes" ]]; then
+    [[ -f "$BACKUP_DIR/ultimate-ai-services.list" ]] || return 1
+    mkdir -p "$RULE_DIR" || return 1
+    restore_tmp="$(mktemp "$RULE_DIR/.ai-gate-restore.XXXXXX")" || return 1
+    cp -p "$BACKUP_DIR/ultimate-ai-services.list" "$restore_tmp" || { rm -f "$restore_tmp"; return 1; }
+    mv -f "$restore_tmp" "$RULE_FILE" || { rm -f "$restore_tmp"; return 1; }
   else
-    rm -f "$RULE_FILE"
+    rm -f "$RULE_FILE" || return 1
   fi
   FILES_RESTORED=1
   local status
@@ -60,7 +57,6 @@ restore_live_files() {
   fi
   return 0
 }
-
 cleanup() {
   local status=$?
   trap - EXIT
