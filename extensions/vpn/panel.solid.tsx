@@ -35,6 +35,11 @@ export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
       <Show when={props.vpn.problem()}><div class="space-y-2 rounded-md bg-muted p-3"><p role="alert">{props.vpn.problem()}</p><Button onClick={() => props.vpn.refresh()} size="sm" variant="outline">Повторить запрос VPN</Button></div></Show>
       <Show when={!props.vpn.status.data() && !props.vpn.status.error()}><p aria-busy="true" class="flex items-center gap-2 py-6 text-muted-foreground"><LoaderCircle class="size-3.5 animate-spin" />Читаю состояние Mihomo…</p></Show>
       <Show when={props.vpn.ready()}>
+        <Show when={!rulesActive()}>
+          <p class="rounded-md bg-muted p-2.5 text-[11px] text-warning" role="alert">
+            Глобальный режим Mihomo: {currentMode()}. Правила маршрутизации сейчас обходятся. Переключение восстановит режим Rule.
+          </p>
+        </Show>
         <div class="rounded-md border border-border p-2.5 space-y-2">
           <div class="flex items-center justify-between gap-2"><span class="flex items-center gap-1.5 font-medium"><Shield class="size-3.5" />Весь интернет</span>
             <Button class="h-7 gap-1.5 px-2 text-xs" disabled={blocked() || !props.vpn.status.data()?.generalGate} onClick={() => props.vpn.power()} size={null} variant={generalOn() ? 'default' : 'outline'}><Power class="size-3.5" />{generalOn() ? 'Через VPN' : rulesActive() ? 'Напрямую' : 'Включить VPN'}</Button>
