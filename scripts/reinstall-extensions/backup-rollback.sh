@@ -44,6 +44,7 @@ rollback_snapshot() {
     backup="$BACKUP_ROOT/$id"
   fi
   [[ "$id" == "latest" || "$id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || fail "Invalid backup ID"
+  [[ ! -L "$backup" ]] || fail "Backup path is a symlink; inspect it manually"
   [[ -d "$backup" && -f "$backup/manifest.tsv" ]] || fail "Backup not found: $id"
   [[ ! -f "$backup/ROLLED_BACK" ]] || fail "Backup was already rolled back: ${backup##*/}"
 
@@ -53,6 +54,8 @@ rollback_snapshot() {
     [[ "$project_root" == /* && "$project_root" != "/" ]] || fail "Invalid project root in backup metadata"
   fi
   if grep -q '^project[[:space:]]' "$backup/manifest.tsv"; then
+    [[ ! -L "$project_root/.ultimate" && ! -L "$project_root/.ultimate/extensions" && ! -L "$project_root/.ultimate/.extension-backups" ]] ||
+      fail "Project .ultimate/extensions or backup root became a symlink"
     [[ -n "$project_root" && -d "$project_root" ]] ||
       fail "Original project root is missing; restore it first: $project_root"
     [[ -d "$project_root/.ultimate/.extension-backups/${backup##*/}" ]] ||
