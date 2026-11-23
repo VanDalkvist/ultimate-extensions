@@ -61,6 +61,7 @@ done
 SOURCE_DIR="$REPO_ROOT/scripts/reinstall-extensions"
 source "$SOURCE_DIR/source-preflight.sh"
 source "$SOURCE_DIR/backup-rollback.sh"
+preflight_target_roots
 
 if [[ "$MODE" == "list" ]]; then list_backups; exit 0; fi
 if [[ "$MODE" == "rollback" ]]; then rollback_snapshot "$BACKUP_ID"; exit 0; fi
