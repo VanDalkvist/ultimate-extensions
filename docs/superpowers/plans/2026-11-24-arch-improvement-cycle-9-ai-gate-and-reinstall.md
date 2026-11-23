@@ -48,7 +48,9 @@ Implementation decisions:
 - Add behavioral filesystem tests for dry-run, full deploy, project override precedence, symlink refusal/preservation, data/dependency preservation, and rollback.
 - Harden AI Gate's config rewrite so the AI rule wins over existing routing rules, config validation targets the actual configured file, and rollback restores both config and rule file (including the case where no prior rule file existed).
 - Split AI route nodes from the general PROXY selector: AI-NODES inherits only the configured subscription providers, excludes static proxies such as the user's cleartext HTTP `shopproxy`, and uses `empty-fallback: REJECT`.
-- Make UI status indicators require Mihomo `rule` mode as well as the matching selector state; a legacy/direct mode must never be presented as a protected state.
+- Make UI status indicators require Mihomo `rule` mode, the expected selector, and a selected node available in AI-NODES; a missing/empty AI provider group is shown as blocked.
+- Make collection rollback validate the entire manifest and all restore payloads before moving any installed directory.
+- Refuse a second AI Gate install while owned groups/provider exist, preventing a rerun from resetting user gate selections.
 
 ## S6–S7: Planned vertical slices and review gates
 
