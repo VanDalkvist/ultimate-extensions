@@ -17,6 +17,7 @@ COMMITTED=0
 YAML_TMP=""
 RULE_TMP=""
 BACKUP_DIR=""
+FILES_RESTORED=0
 fail() { echo "[error] $*" >&2; exit 1; }
 sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
 api_reload() {
@@ -114,9 +115,6 @@ curl -fsS --max-time 5 "$API/version" >/dev/null || fail "Mihomo API is unavaila
   fail "PROXY must reference one or more subscription providers under use"
 LAST_RULE="$("$YQ" -r '.rules[-1] // ""' "$CONFIG")"
 [[ "$LAST_RULE" == MATCH,* ]] || fail "The final rule must be MATCH,...; refusing to reorder an unknown rule set"
-PROXY_USE="$("$YQ" -o=yaml -r '.proxy-groups[] | select(.name == "PROXY") | .use // []' "$CONFIG")"
-[[ -n "$PROXY_USE" && "$PROXY_USE" != "[]" ]] || fail "PROXY must define provider references under use; AI-NODES only accepts provider-backed VPN nodes"
-export PROXY_USE
 for group in GENERAL-GATE AI-GATE; do
   COUNT="$("$YQ" -r "[.proxy-groups[]? | select(.name == \"$group\")] | length" "$CONFIG")"
   if [[ "$COUNT" != "0" ]]; then
