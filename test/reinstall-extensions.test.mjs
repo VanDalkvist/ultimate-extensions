@@ -146,10 +146,10 @@ test('rollback rejects traversal or unknown extension names in a modified manife
   const f = fixture(t)
   const result = run(['--apply'], f.env)
   assertOk(result)
-  const backupLine = result.stdout.split('\\n').find(line => line.startsWith('[backup] '))
+  const backupLine = result.stdout.split('\n').find(line => line.startsWith('[backup] '))
   assert.ok(backupLine, result.stdout)
   const backupRoot = backupLine.slice('[backup] '.length)
-  writeFileSync(join(backupRoot, 'manifest.tsv'), 'global\\t../../victim\\tpresent\\n')
+  writeFileSync(join(backupRoot, 'manifest.tsv'), 'global\t../../victim\tpresent\n')
 
   const victim = join(f.home, 'victim')
   mkdirSync(victim)
