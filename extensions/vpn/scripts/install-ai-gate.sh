@@ -184,8 +184,11 @@ RULES
       else .
       end
     )
-    | (if any(.[]; .name == "GENERAL-GATE") then . else . + [{"name":"GENERAL-GATE","type":"select","proxies":["PROXY","DIRECT"]}] end)
-    | (if any(.[]; .name == "AI-GATE") then . else . + [{"name":"AI-GATE","type":"select","proxies":["PROXY","REJECT"]}] end)
+    | map(select(.name != "GENERAL-GATE" and .name != "AI-GATE"))
+    + [
+      {"name":"GENERAL-GATE","type":"select","proxies":["PROXY","DIRECT"]},
+      {"name":"AI-GATE","type":"select","proxies":["PROXY","REJECT"]}
+    ]
   )
   | .mode = "rule"
   | .["rule-providers"]["ultimate-ai-services"] = {
