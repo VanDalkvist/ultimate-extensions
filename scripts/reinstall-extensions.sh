@@ -182,7 +182,7 @@ list_backups() {
     found=1
     printf '%s\n' "${path##*/}"
   done
-  ((found)) || info "empty" "No available extension backups"
+  if ((found == 0)); then info "empty" "No available extension backups"; fi
 }
 
 rollback_snapshot() {
@@ -298,7 +298,7 @@ if [[ -n "$PROJECT_ROOT" && -d "$PROJECT_ROOT/.ultimate/extensions" ]]; then
   done
 fi
 
-if (("${#TARGET_PATHS[@]}" == 0)); then
+if ((${#TARGET_PATHS[@]} == 0)); then
   info "current" "Every installed extension already links to the repository source; nothing to copy."
   exit 0
 fi
