@@ -1,6 +1,6 @@
 # VPN
 
-Status-line VPN controls for an existing Mihomo controller: manual server/provider selection, latency refresh, Dashboard and configuration-file shortcuts.
+Status-line VPN controls for an existing Mihomo controller: manual server/provider selection, latency refresh, independent general-traffic and AI-traffic gates, Dashboard and configuration-file shortcuts.
 
 ## Requirements
 - Node 26+ and a compatible Ultimate **Solid 2** SDK; this snapshot uses the native web.solid.tsx entry. It is not the older React/island facet used by some other collection extensions.
@@ -25,7 +25,18 @@ When copying rather than linking, initialize the dependency first and include de
 
 ## Configuration and use
 Optional MIHOMO_API_URL, MIHOMO_API_SECRET and MIHOMO_PROXY_GROUP live only in ~/Projects/.env on the Ultimate server. The same file supports MIHOMO_CONFIG_PATH (absolute YAML path), MIHOMO_EDITOR (one executable/app name, never a shell command string), and MIHOMO_DASHBOARD_URL (explicit browser-facing HTTPS URL, or loopback HTTP; no credentials/query/hash). YAML defaults detect ARM/Intel Homebrew on macOS and ~/.config/mihomo on Linux/Windows, including an existing Linux XDG path. URL is restricted to loopback HTTP, without path, URL credentials, query or fragment. Secrets stay server-side; files are never served to the browser.
-Click the shield or run VPN… in the command palette. Server choice is manual. Selecting while in direct mode enables rule mode. Power switches **rule/direct mode**, not the daemon or TUN; it is not a kill switch. These are global Mihomo settings shared with other clients, including BB.
+Click the shield or run VPN… in the command palette. Server choice is manual. The current branch adds separate selectors:
+- GENERAL-GATE: PROXY or DIRECT for ordinary traffic.
+- AI-GATE: PROXY or REJECT for AI domains.
+
+Install the matching Mihomo config before using these controls:
+```sh
+brew install yq
+bash extensions/vpn/scripts/install-ai-gate.sh
+```
+The script backs up the YAML and previous rule file, removes DIRECT from the manual PROXY node selector, adds local AI domain rules, creates both gates, sets mode=rule, validates with Mihomo, and reloads through the loopback API. Review the generated backup and AI list. It expects the default Homebrew config path and a loopback controller at 127.0.0.1:9090; override MIHOMO_CONFIG_PATH, MIHOMO_RULE_DIR and MIHOMO_API_URL when needed.
+
+The extension's general toggle changes GENERAL-GATE; the AI toggle changes AI-GATE. Both preserve global rule mode. The AI gate is fail-closed for matching domains while Mihomo is running and processing rules. It does not protect against a crash/stop of the Mihomo daemon or TUN; system-level fail-closed still requires a separate macOS packet-filter/Network Extension design. These are global Mihomo settings shared with other clients, including BB.
 The default Dashboard points to loopback. When Ultimate is opened on a remote hostname, the UI disables that misleading local link and explains how to set MIHOMO_DASHBOARD_URL for an existing secure forwarding setup. It does not create a tunnel or expose an endpoint. Native files open on the Ultimate host, not the browser device. Do not expose Ultimate or Mihomo to the internet to work around this limitation.
 An enabled/rule indicator and a successful controller response are not proof of public-IP/DNS routing, connectivity or leak prevention. No such live-network test is asserted.
 
