@@ -69,8 +69,8 @@ Implementation decisions:
 ### Slice 2 — AI protection status contract
 - Boundary: VPN read-model/presentation contract.
 - AP gates: AP-012, AP-016, AP-026, AP-032, AP-076.
-- Red test first: a snapshot with AI selector=PROXY and global mode=direct must render the AI gate as unprotected; in rule mode the same selection must render protected.
-- Implementation: explicit derived gate status and truthful panel states.
+- Red test first: a snapshot with AI selector=AI-NODES and global mode=direct must render the AI gate as unprotected; in rule mode the same selection must render protected.
+- Implementation: explicit derived gate status, provider-only AI-NODES selection and truthful panel states. Selecting a subscription node mirrors it into AI-NODES; selecting a static proxy leaves the previous AI node unchanged.
 - Stop condition: UI labels claim protection from selector state alone.
 
 ### Slice 3 — collection installer coverage
