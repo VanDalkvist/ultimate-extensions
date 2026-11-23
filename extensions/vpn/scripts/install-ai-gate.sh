@@ -139,7 +139,6 @@ if [[ "$PROVIDER_EXISTS" == "true" ]]; then
   "$YQ" -e '.["rule-providers"]["ultimate-ai-services"] == {"type":"file","behavior":"classical","format":"text","path":"./rules/ultimate-ai-services.list"}' "$CONFIG" >/dev/null ||
     fail "A different rule-provider already uses the name ultimate-ai-services"
 fi
-
 STAMP="$(date '+%Y%m%d-%H%M%S')-$$-$RANDOM"
 mkdir -p "$BACKUP_ROOT" "$RULE_DIR"
 BACKUP_DIR="$BACKUP_ROOT/$STAMP"
@@ -151,7 +150,6 @@ if [[ -f "$RULE_FILE" ]]; then
 else
   printf 'no\n' > "$BACKUP_DIR/rule-existed"
 fi
-
 YAML_TMP="$(mktemp "$CONFIG_DIR/.config.ai-gate.XXXXXX")"
 RULE_TMP="$(mktemp "$RULE_DIR/.ultimate-ai-services.XXXXXX")"
 cp -p "$CONFIG" "$YAML_TMP"
