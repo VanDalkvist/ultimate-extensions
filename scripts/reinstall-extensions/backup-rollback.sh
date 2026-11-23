@@ -27,6 +27,35 @@ list_backups() {
   if ((found == 0)); then info "empty" "No available extension backups"; fi
 }
 
+
+validate_rollback_manifest() {
+  local backup="$1" project_root="$2" scope ext state target before scope_backup
+  awk -F '\\t' '
+    NF != 3 { exit 1 }
+    $1 !~ /^(global|project)$/ { exit 1 }
+    $2 !~ /^(files|right-panel-resize|subscription-usage|terminal|themes|vpn)$/ { exit 1 }
+    $3 !~ /^(present|absent)$/ { exit 1 }
+    seen[$1 SUBSEP $2]++ { exit 1 }
+    END { if (NR == 0) exit 1 }
+  ' "$backup/manifest.tsv" || fail "Backup manifest is malformed or contains duplicate/unknown entries"
+
+  while IFS=$'\\t' read -r scope ext state; do
+    if [[ "$scope" == "global" ]]; then
+      target="$GLOBAL_ROOT/$ext"
+    else
+      [[ -n "$project_root" && -d "$project_root" ]] || fail "Project root from backup is unavailable: $project_root"
+      target="$project_root/.ultimate/extensions/$ext"
+    fi
+    scope_backup="$(scope_backup_path "$backup" "$scope")"
+    before="$scope_backup/before/$scope/$ext"
+    [[ ! -L "$target" ]] || fail "Rollback target became a symlink: $target"
+    [[ ! -L "$before" ]] || fail "Rollback backup entry is a symlink: $before"
+    if [[ "$state" == "present" ]]; then
+      [[ -d "$before" ]] || fail "Backup payload is missing for $scope/$ext"
+    fi
+  done < "$backup/manifest.tsv"
+}
+
 rollback_snapshot() {
   local id="$1" backup
   if [[ "$id" == "latest" ]]; then
@@ -62,6 +91,7 @@ rollback_snapshot() {
       fail "Project backup payload is missing under $project_root/.ultimate/.extension-backups"
   fi
 
+  validate_rollback_manifest "$backup" "$project_root"
   info "rollback" "Restoring ${backup##*/}"
   while IFS=$'\t' read -r scope ext state; do
     [[ -n "$scope" && -n "$ext" && -n "$state" ]] || continue
