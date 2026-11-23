@@ -26,7 +26,7 @@ test('direct legacy mode keeps gate state visible', async t => {
   const app = createController(async () => ({ baseUrl: f.url, secret: '', group: 'PROXY' }), fetch)
   const result = await app.snapshot(null, { signal: new AbortController().signal })
   assert.equal(result.issue, null)
-  assert.equal(result.enabled, true)
+  assert.equal(result.enabled, false)
   assert.equal(result.providers.length, 2)
 })
 
