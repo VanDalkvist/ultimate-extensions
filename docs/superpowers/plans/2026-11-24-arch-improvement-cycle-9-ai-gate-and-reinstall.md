@@ -47,6 +47,7 @@ Implementation decisions:
 - Native dependency installation is a separate explicit option; it is not silently run during a source reinstall.
 - Add behavioral filesystem tests for dry-run, full deploy, project override precedence, symlink refusal/preservation, data/dependency preservation, and rollback.
 - Harden AI Gate's config rewrite so the AI rule wins over existing routing rules, config validation targets the actual configured file, and rollback restores both config and rule file (including the case where no prior rule file existed).
+- Split AI route nodes from the general PROXY selector: AI-NODES inherits only the configured subscription providers, excludes static proxies such as the user's cleartext HTTP `shopproxy`, and uses `empty-fallback: REJECT`.
 - Make UI status indicators require Mihomo `rule` mode as well as the matching selector state; a legacy/direct mode must never be presented as a protected state.
 
 ## S6–S7: Planned vertical slices and review gates
