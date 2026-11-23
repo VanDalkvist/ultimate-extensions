@@ -195,5 +195,5 @@ done
 trap - ERR
 info "done" "All selected extensions installed."
 info "backup" "$BACKUP"
-info "rollback" "bash scripts/reinstall-extensions.sh --rollback $STAMP"
+printf '[rollback] bash %q --rollback %q\\n' "$REPO_ROOT/scripts/reinstall-extensions.sh" "$STAMP"
 info "next" "Reload Ultimate. Stop active Terminal shells before replacing the installed Terminal folder."
