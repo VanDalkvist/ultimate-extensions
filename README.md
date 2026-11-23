@@ -45,8 +45,11 @@ git submodule update --init --recursive
 # Preview destinations; no files are changed
 bash scripts/reinstall-extensions.sh --dry-run
 
-# Apply global copies and existing overrides in the current project
-bash scripts/reinstall-extensions.sh --apply --project-root "$PWD" --ultimate-root /absolute/path/to/ultimate
+# Apply personal copies; replace the path with your actual Ultimate checkout
+bash scripts/reinstall-extensions.sh --apply --ultimate-root /path/to/ultimate
+
+# Optional: also update overrides already present in a specific project
+bash scripts/reinstall-extensions.sh --apply --project-root /path/to/your-project --ultimate-root /path/to/ultimate
 
 # List saved restore points
 bash scripts/reinstall-extensions.sh --list-backups
