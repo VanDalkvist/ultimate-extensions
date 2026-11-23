@@ -3,6 +3,7 @@ import { once } from 'node:events'
 
 export const NODE = '🇫🇮 Demo / Unicode [Test] · №1'
 export const SECOND = '🇩🇪 Germany — #2'
+export const SHOP = 'shopproxy'
 
 export async function fixture() {
   const state = {
@@ -33,10 +34,11 @@ export async function fixture() {
     const payload: Record<string, unknown> = {
       '/configs': { mode: state.mode, secret: 'not-exported', tun: { enable: true } },
       '/proxies': { proxies: {
-        PROXY: { type: 'Selector', now: state.selected, all: [NODE, SECOND] },
+        PROXY: { type: 'Selector', now: state.selected, all: [NODE, SECOND, SHOP] },
         'GENERAL-GATE': { type: 'Selector', now: state.general, all: ['PROXY', 'DIRECT'] },
         'AI-GATE': { type: 'Selector', now: state.ai, all: ['AI-NODES', 'REJECT'] },
         'AI-NODES': { type: 'Selector', now: state.aiNode, all: [NODE, SECOND] },
+        [SHOP]: { type: 'Http', history: [] },
       } },
       '/providers/proxies': { providers: {
         personal: { name: 'Personal', vehicleType: 'HTTP', url: 'private-subscription', proxies: [
