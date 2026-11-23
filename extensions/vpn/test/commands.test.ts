@@ -17,7 +17,7 @@ test('select from direct restores rule mode and serializes commands', async t =>
   await app.aiPower({enabled:false},ctx())
   assert.equal(f.state.ai, 'REJECT')
   await app.aiPower({enabled:true},ctx())
-  assert.equal(f.state.ai, 'PROXY')
+  assert.equal(f.state.ai, 'AI-NODES')
 })
 
 test('power toggles a selector and keeps global Mihomo mode in rule', async t => {
@@ -68,7 +68,7 @@ test('gate toggles restore Rule mode even when the selector already says PROXY',
   const f = await fixture(); t.after(() => f.close())
   f.state.mode = 'direct'
   f.state.general = 'PROXY'
-  f.state.ai = 'PROXY'
+  f.state.ai = 'AI-NODES'
   const app = createController(async () => ({ baseUrl: f.url, secret: '', group: 'PROXY' }), fetch)
 
   const general = await app.power({ enabled: true }, ctx())
@@ -78,14 +78,23 @@ test('gate toggles restore Rule mode even when the selector already says PROXY',
   f.state.mode = 'direct'
   const ai = await app.aiPower({ enabled: true }, ctx())
   assert.equal(ai.mode, 'rule')
-  assert.equal(ai.aiGate?.selected, 'PROXY')
+  assert.equal(ai.aiGate?.selected, 'AI-NODES')
   assert.deepEqual(
     f.state.calls.filter(c => c.method !== 'GET').map(c => [c.method, c.path, c.body]),
     [
       ['PATCH', '/configs', { mode: 'rule' }],
       ['PUT', '/proxies/GENERAL-GATE', { name: 'PROXY' }],
       ['PATCH', '/configs', { mode: 'rule' }],
-      ['PUT', '/proxies/AI-GATE', { name: 'PROXY' }],
+      ['PUT', '/proxies/AI-GATE', { name: 'AI-NODES' }],
     ],
   )
+})
+
+test('provider node selection mirrors into AI-NODES; static proxy selection does not replace it', async t => {
+  const f = await fixture(); t.after(() => f.close())
+  const app = createController(async () => ({ baseUrl: f.url, secret: '', group: 'PROXY' }), fetch)
+  const after = await app.select({ node: SECOND }, ctx())
+  assert.equal(after.activeProxy, SECOND)
+  assert.equal(after.aiProxy, SECOND)
+  assert.ok(f.state.calls.some(c => c.method === 'PUT' && c.path === '/proxies/AI-NODES' && (c.body as {name:string}).name === SECOND))
 })
