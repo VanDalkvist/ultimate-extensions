@@ -29,14 +29,26 @@ Click the shield or run VPN… in the command palette. Server choice is manual. 
 - GENERAL-GATE: PROXY or DIRECT for ordinary traffic.
 - AI-GATE: PROXY or REJECT for AI domains.
 
-Install the matching Mihomo config before using these controls:
+Install the matching Mihomo config before using these controls. On the user's Homebrew macOS setup:
+
 ```sh
 brew install yq
-bash extensions/vpn/scripts/install-ai-gate.sh
+sudo env \
+  MIHOMO_CONFIG_PATH=/opt/homebrew/etc/mihomo/config.yaml \
+  YQ=/opt/homebrew/bin/yq \
+  MIHOMO_BIN=/opt/homebrew/bin/mihomo \
+  bash extensions/vpn/scripts/install-ai-gate.sh
 ```
-The script backs up the YAML and previous rule file, removes DIRECT from the manual PROXY node selector, adds local AI domain rules, creates both gates, sets mode=rule, validates with Mihomo, and reloads through the loopback API. Review the generated backup and AI list. It expects the default Homebrew config path and a loopback controller at 127.0.0.1:9090; override MIHOMO_CONFIG_PATH, MIHOMO_RULE_DIR and MIHOMO_API_URL when needed.
 
-The extension's general toggle changes GENERAL-GATE; the AI toggle changes AI-GATE. Both preserve global rule mode. The AI gate is fail-closed for matching domains while Mihomo is running and processing rules. It does not protect against a crash/stop of the Mihomo daemon or TUN; system-level fail-closed still requires a separate macOS packet-filter/Network Extension design. These are global Mihomo settings shared with other clients, including BB.
+The script backs up the YAML and previous AI rule file in `<config-dir>/.ai-gate-backups/<id>`, removes DIRECT/REJECT options from the manual PROXY selector, sets its `empty-fallback: REJECT`, adds local AI domain rules at the **top** of the rules list, creates both gates and keeps mode=rule. It validates the temporary config with Mihomo's `-t -d <config-dir> -f <temp-config>` flags before replacing the active YAML, then reloads through the loopback API. It checks for conflicting group/provider names and refuses to overwrite them.
+
+The installer prints a `--rollback <id>` command. Rollback restores the original YAML and the previous AI rule file (or removes the newly created rule file when there was no previous one). It checks SHA-256 hashes first and refuses to overwrite later manual edits.
+
+The extension's general toggle changes GENERAL-GATE; the AI toggle changes AI-GATE. The panel treats a gate as active only while Mihomo global mode is `rule`; if another client changes it to `direct` or `global`, the panel warns and a gate action restores `rule`.
+
+**Routing scope:** AI-GATE uses the existing PROXY selector. Every option inside PROXY remains eligible, including any static proxy you have put there. Your current config includes `shopproxy` with `tls: false`; selecting it routes AI connections through that HTTP proxy, but the Mac-to-proxy hop itself is unencrypted. For confidential AI use, select a tested encrypted provider node and verify its TCP/UDP exit. The installer deliberately preserves shopproxy rather than silently deleting your existing proxy.
+
+AI-GATE blocks matching domains through Mihomo while the daemon/TUN are alive and rule mode is active. A daemon crash or TUN teardown requires a separate system-level macOS fail-closed mechanism. Settings are shared by other Mihomo clients, including BB.
 The default Dashboard points to loopback. When Ultimate is opened on a remote hostname, the UI disables that misleading local link and explains how to set MIHOMO_DASHBOARD_URL for an existing secure forwarding setup. It does not create a tunnel or expose an endpoint. Native files open on the Ultimate host, not the browser device. Do not expose Ultimate or Mihomo to the internet to work around this limitation.
 An enabled/rule indicator and a successful controller response are not proof of public-IP/DNS routing, connectivity or leak prevention. No such live-network test is asserted.
 
