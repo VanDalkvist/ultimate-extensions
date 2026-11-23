@@ -63,3 +63,29 @@ test('global mode is normalized to rule when a gate is toggled', async t => {
   assert.equal(after.mode,'rule')
   assert.equal(after.aiGate?.selected,'REJECT')
 })
+
+test('gate toggles restore Rule mode even when the selector already says PROXY', async t => {
+  const f = await fixture(); t.after(() => f.close())
+  f.state.mode = 'direct'
+  f.state.general = 'PROXY'
+  f.state.ai = 'PROXY'
+  const app = createController(async () => ({ baseUrl: f.url, secret: '', group: 'PROXY' }), fetch)
+
+  const general = await app.power({ enabled: true }, ctx())
+  assert.equal(general.mode, 'rule')
+  assert.equal(general.generalGate?.selected, 'PROXY')
+
+  f.state.mode = 'direct'
+  const ai = await app.aiPower({ enabled: true }, ctx())
+  assert.equal(ai.mode, 'rule')
+  assert.equal(ai.aiGate?.selected, 'PROXY')
+  assert.deepEqual(
+    f.state.calls.filter(c => c.method !== 'GET').map(c => [c.method, c.path, c.body]),
+    [
+      ['PATCH', '/configs', { mode: 'rule' }],
+      ['PUT', '/proxies/GENERAL-GATE', { name: 'PROXY' }],
+      ['PATCH', '/configs', { mode: 'rule' }],
+      ['PUT', '/proxies/AI-GATE', { name: 'PROXY' }],
+    ],
+  )
+})
