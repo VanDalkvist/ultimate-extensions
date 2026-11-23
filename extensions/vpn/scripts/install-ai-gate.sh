@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Install the AI/GENERAL traffic gates into an existing Mihomo configuration.
-# A unique config-local backup is created; --rollback restores that exact snapshot.
 set -Eeuo pipefail
 umask 077
 
@@ -121,13 +119,11 @@ fi
 [[ "$API" =~ ^http://(127\.0\.0\.1|localhost):[0-9]+$ ]] || fail "MIHOMO_API_URL must be a loopback HTTP origin such as http://127.0.0.1:9090"
 curl -fsS --max-time 5 "$API/version" >/dev/null || fail "Mihomo API is unavailable at $API"
 
-# Require the existing PROXY to be the manual selector that owns provider nodes.
 "$YQ" -e '.proxy-groups[] | select(.name == "PROXY" and .type == "select")' "$CONFIG" >/dev/null ||
   fail "Could not find a manual PROXY selector in $CONFIG"
 LAST_RULE="$("$YQ" -r '.rules[-1] // ""' "$CONFIG")"
 [[ "$LAST_RULE" == MATCH,* ]] || fail "The final rule must be MATCH,...; refusing to reorder an unknown rule set"
 
-# Existing names are accepted only when they already have this exact gate contract.
 for group in GENERAL-GATE AI-GATE; do
   COUNT="$("$YQ" -r "[.proxy-groups[]? | select(.name == \"$group\")] | length" "$CONFIG")"
   if [[ "$COUNT" != "0" ]]; then
@@ -211,7 +207,6 @@ RULES
   | .rules = (["RULE-SET,ultimate-ai-services,AI-GATE"] + ((.rules // []) | map(select(. != "RULE-SET,ultimate-ai-services,AI-GATE"))))
 ' "$YAML_TMP"
 
-# Preserve original file mode after yq writes the staged YAML.
 chmod 600 "$YAML_TMP"
 
 "$YQ" -e '.mode == "rule"' "$YAML_TMP" >/dev/null || fail "Staged config is not in rule mode"
@@ -224,7 +219,6 @@ chmod 600 "$YAML_TMP"
 "$YQ" -e '.proxy-groups[] | select(.name == "AI-GATE" and .type == "select" and .proxies == ["PROXY","REJECT"])' "$YAML_TMP" >/dev/null ||
   fail "AI-GATE validation failed"
 
-# Install the referenced local rule file before Mihomo validates the staged YAML.
 STARTED=1
 mv -f "$RULE_TMP" "$RULE_FILE"
 RULE_TMP=""
