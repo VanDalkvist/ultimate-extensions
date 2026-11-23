@@ -123,6 +123,10 @@ curl -fsS --max-time 5 "$API/version" >/dev/null || fail "Mihomo API is unavaila
 LAST_RULE="$("$YQ" -r '.rules[-1] // ""' "$CONFIG")"
 [[ "$LAST_RULE" == MATCH,* ]] || fail "The final rule must be MATCH,...; refusing to reorder an unknown rule set"
 
+PROXY_USE="$("$YQ" -o=yaml -r '.proxy-groups[] | select(.name == "PROXY") | .use // []' "$CONFIG")"
+[[ -n "$PROXY_USE" && "$PROXY_USE" != "[]" ]] || fail "PROXY must define provider references under use; AI-NODES only accepts provider-backed VPN nodes"
+export PROXY_USE
+
 for group in GENERAL-GATE AI-GATE; do
   COUNT="$("$YQ" -r "[.proxy-groups[]? | select(.name == \"$group\")] | length" "$CONFIG")"
   if [[ "$COUNT" != "0" ]]; then
@@ -130,11 +134,16 @@ for group in GENERAL-GATE AI-GATE; do
       "$YQ" -e '.proxy-groups[] | select(.name == "GENERAL-GATE" and .type == "select" and .proxies == ["PROXY", "DIRECT"])' "$CONFIG" >/dev/null ||
         fail "A different group already uses GENERAL-GATE; rename it manually before installing"
     else
-      "$YQ" -e '.proxy-groups[] | select(.name == "AI-GATE" and .type == "select" and .proxies == ["PROXY", "REJECT"])' "$CONFIG" >/dev/null ||
+      "$YQ" -e '.proxy-groups[] | select(.name == "AI-GATE" and .type == "select" and .proxies == ["AI-NODES", "REJECT"])' "$CONFIG" >/dev/null ||
         fail "A different group already uses AI-GATE; rename it manually before installing"
     fi
   fi
 done
+AI_NODES_EXISTS="$("$YQ" -r '[.proxy-groups[]? | select(.name == "AI-NODES")] | length' "$CONFIG")"
+if [[ "$AI_NODES_EXISTS" != "0" ]]; then
+  "$YQ" -e '(.proxy-groups[] | select(.name == "AI-NODES" and .type == "select" and .["empty-fallback"] == "REJECT") | .use) == (.proxy-groups[] | select(.name == "PROXY") | .use)' "$CONFIG" >/dev/null ||
+    fail "A different group already uses AI-NODES; rename it manually before installing"
+fi
 PROVIDER_EXISTS="$("$YQ" -r '.["rule-providers"] // {} | has("ultimate-ai-services")' "$CONFIG")"
 if [[ "$PROVIDER_EXISTS" == "true" ]]; then
   "$YQ" -e '.["rule-providers"]["ultimate-ai-services"] == {"type":"file","behavior":"classical","format":"text","path":"./rules/ultimate-ai-services.list"}' "$CONFIG" >/dev/null ||
@@ -180,8 +189,9 @@ DOMAIN-SUFFIX,perplexity.ai
 DOMAIN-SUFFIX,openrouter.ai
 RULES
 
-"$YQ" -i '
-  .proxy-groups |= (
+PROXY_USE="$PROXY_USE" "$YQ" -i '
+  (.proxy-groups[] | select(.name == "PROXY") | .use) as $proxy_use
+  | .proxy-groups |= (
     map(
       if .name == "PROXY" then
         .proxies = ((.proxies // []) | map(select(. != "DIRECT" and . != "REJECT" and . != "REJECT-DROP")))
@@ -190,10 +200,11 @@ RULES
       else .
       end
     )
-    | map(select(.name != "GENERAL-GATE" and .name != "AI-GATE"))
+    | map(select(.name != "AI-NODES" and .name != "GENERAL-GATE" and .name != "AI-GATE"))
     + [
+      {"name":"AI-NODES","type":"select","use":env(PROXY_USE),"empty-fallback":"REJECT"},
       {"name":"GENERAL-GATE","type":"select","proxies":["PROXY","DIRECT"]},
-      {"name":"AI-GATE","type":"select","proxies":["PROXY","REJECT"]}
+      {"name":"AI-GATE","type":"select","proxies":["AI-NODES","REJECT"]}
     ]
   )
   | .mode = "rule"
@@ -215,7 +226,9 @@ chmod 600 "$YAML_TMP"
   fail "PROXY selector validation failed"
 "$YQ" -e '.proxy-groups[] | select(.name == "GENERAL-GATE" and .type == "select" and .proxies == ["PROXY","DIRECT"])' "$YAML_TMP" >/dev/null ||
   fail "GENERAL-GATE validation failed"
-"$YQ" -e '.proxy-groups[] | select(.name == "AI-GATE" and .type == "select" and .proxies == ["PROXY","REJECT"])' "$YAML_TMP" >/dev/null ||
+"$YQ" -e '.proxy-groups[] | select(.name == "AI-NODES" and .type == "select" and .["empty-fallback"] == "REJECT" and (.use | length > 0))' "$YAML_TMP" >/dev/null ||
+  fail "AI-NODES must contain subscription proxy providers and reject empty fallback"
+"$YQ" -e '.proxy-groups[] | select(.name == "AI-GATE" and .type == "select" and .proxies == ["AI-NODES","REJECT"])' "$YAML_TMP" >/dev/null ||
   fail "AI-GATE validation failed"
 
 STARTED=1
@@ -241,6 +254,6 @@ COMMITTED=1
 echo "[done] AI Gate installed and Mihomo reloaded."
 echo "[backup] $BACKUP_DIR"
 echo "[rollback] sudo env MIHOMO_CONFIG_PATH='$CONFIG' bash $0 --rollback '$STAMP'"
-echo "[groups] PROXY (proxy nodes), GENERAL-GATE (PROXY/DIRECT), AI-GATE (PROXY/REJECT)"
+echo "[groups] PROXY (regular nodes + static proxies), AI-NODES (subscription providers only), GENERAL-GATE (PROXY/DIRECT), AI-GATE (AI-NODES/REJECT)"
 echo "[rules] AI domain rule inserted first; existing remaining rule order preserved."
 echo "[note] AI Gate only enforces matching rules while Mihomo is in rule mode and has a functioning route."
