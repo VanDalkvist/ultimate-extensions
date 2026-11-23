@@ -6,7 +6,7 @@ import { SegmentedControl, SegmentedControlItem } from '@/components/ui/segmente
 import { cn } from '@/sdk/solid'
 import type { VpnReader } from './readers.solid.tsx'
 import { SettingsAccess } from './settings.solid.tsx'
-import { modeLabel } from './presentation.ts'
+import { gateRouteActive, modeLabel } from './presentation.ts'
 
 export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
   const [chosen, setChosen] = createSignal<string | null>(null)
@@ -19,8 +19,10 @@ export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
   )
   const blocked = () => !props.vpn.ready() || props.vpn.busy()
   const statusLabel = () => modeLabel(props.vpn.ready() ? props.vpn.status.data()?.mode : null)
-  const generalOn = () => props.vpn.status.data()?.generalGate?.selected === 'PROXY'
-  const aiOn = () => props.vpn.status.data()?.aiGate?.selected === 'PROXY'
+  const currentMode = () => props.vpn.status.data()?.mode
+  const rulesActive = () => currentMode() === 'rule'
+  const generalOn = () => gateRouteActive(currentMode(), props.vpn.status.data()?.generalGate?.selected, 'PROXY')
+  const aiOn = () => gateRouteActive(currentMode(), props.vpn.status.data()?.aiGate?.selected, 'PROXY')
   return (
     <section aria-label="Управление VPN" class="flex max-h-[min(520px,80dvh)] flex-col gap-3 p-3 text-xs" data-vpn-panel>
       <header class="flex shrink-0 items-center justify-between gap-2">
@@ -35,13 +37,13 @@ export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
       <Show when={props.vpn.ready()}>
         <div class="rounded-md border border-border p-2.5 space-y-2">
           <div class="flex items-center justify-between gap-2"><span class="flex items-center gap-1.5 font-medium"><Shield class="size-3.5" />Весь интернет</span>
-            <Button class="h-7 gap-1.5 px-2 text-xs" disabled={blocked() || !props.vpn.status.data()?.generalGate} onClick={() => props.vpn.power()} size={null} variant={generalOn() ? 'default' : 'outline'}><Power class="size-3.5" />{generalOn() ? 'Через VPN' : 'Напрямую'}</Button>
+            <Button class="h-7 gap-1.5 px-2 text-xs" disabled={blocked() || !props.vpn.status.data()?.generalGate} onClick={() => props.vpn.power()} size={null} variant={generalOn() ? 'default' : 'outline'}><Power class="size-3.5" />{generalOn() ? 'Через VPN' : rulesActive() ? 'Напрямую' : 'Включить VPN'}</Button>
           </div>
           <p class="text-[11px] text-muted-foreground">Управляет обычным интернет-трафиком. AI-маршрут имеет отдельный переключатель.</p>
         </div>
         <div class="rounded-md border border-border p-2.5 space-y-2">
           <div class="flex items-center justify-between gap-2"><span class="flex items-center gap-1.5 font-medium"><Bot class="size-3.5" />Нейросети</span>
-            <Button class="h-7 gap-1.5 px-2 text-xs" disabled={blocked() || !props.vpn.status.data()?.aiGate} onClick={() => props.vpn.aiPower()} size={null} variant={aiOn() ? 'default' : 'outline'}><Power class="size-3.5" />{aiOn() ? 'Защищены' : 'Заблокированы'}</Button>
+            <Button class="h-7 gap-1.5 px-2 text-xs" disabled={blocked() || !props.vpn.status.data()?.aiGate} onClick={() => props.vpn.aiPower()} size={null} variant={aiOn() ? 'default' : 'outline'}><Power class="size-3.5" />{aiOn() ? 'Защищены' : rulesActive() ? 'Заблокированы' : 'Восстановить защиту'}</Button>
           </div>
           <p class="text-[11px] text-muted-foreground">AI-сервисы используют только PROXY. При выключении соединения блокируются через REJECT.</p>
         </div>
