@@ -119,7 +119,7 @@ for group in GENERAL-GATE AI-GATE AI-NODES; do
   COUNT="$("$YQ" -r "[.proxy-groups[]? | select(.name == \"$group\")] | length" "$CONFIG")"
   [[ "$COUNT" == "0" ]] || fail "$group already exists. Use the printed rollback command before reinstalling AI Gate."
 done
-PROVIDER_EXISTS="$("$YQ" -r '.[\"rule-providers\"] // {} | has(\"ultimate-ai-services\")' "$CONFIG")"
+PROVIDER_EXISTS="$("$YQ" -r '."rule-providers" // {} | has("ultimate-ai-services")' "$CONFIG")"
 [[ "$PROVIDER_EXISTS" == "false" ]] || fail "ultimate-ai-services rule provider already exists. Roll back the previous AI Gate install first."
 
 STAMP="$(date '+%Y%m%d-%H%M%S')-$$-$RANDOM"
