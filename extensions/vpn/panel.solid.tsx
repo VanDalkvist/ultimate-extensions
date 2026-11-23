@@ -23,7 +23,10 @@ export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
   const rulesActive = () => currentMode() === 'rule'
   const generalOn = () => gateRouteActive(currentMode(), props.vpn.status.data()?.generalGate?.selected, 'PROXY')
   const aiOn = () => aiRouteActive(currentMode(), props.vpn.status.data()?.aiGate?.selected, props.vpn.status.data()?.aiNodes?.selected, props.vpn.status.data()?.aiNodes?.options)
-  const aiNodeReady = () => !!props.vpn.status.data()?.aiNodes?.selected && !!props.vpn.status.data()?.aiNodes?.options.includes(props.vpn.status.data()!.aiNodes!.selected!)
+  const aiNodeReady = () => {
+    const nodes = props.vpn.status.data()?.aiNodes
+    return !!nodes?.selected && nodes.options.includes(nodes.selected)
+  }
   return (
     <section aria-label="Управление VPN" class="flex max-h-[min(520px,80dvh)] flex-col gap-3 p-3 text-xs" data-vpn-panel>
       <header class="flex shrink-0 items-center justify-between gap-2">
