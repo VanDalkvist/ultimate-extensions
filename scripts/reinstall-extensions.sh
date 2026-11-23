@@ -113,7 +113,13 @@ preflight_target() {
 
 preserve_runtime_dependencies() {
   local ext="$1" target="$2" staged="$3"
-  if [[ -e "$target/node_modules" || -L "$target/node_modules" ]]; then
+  if [[ "$ext" == "terminal" && $WITH_DEPS -eq 1 ]]; then
+    info "deps" "Installing Terminal dependencies in staged copy"
+    (cd "$staged" && npm ci)
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      (cd "$staged/node_modules/node-pty" && npm exec --yes --package=node-gyp@13.1.0 -- node-gyp rebuild)
+    fi
+  elif [[ -e "$target/node_modules" || -L "$target/node_modules" ]]; then
     cp -a "$target/node_modules" "$staged/node_modules"
   elif [[ "$ext" == "files" ]]; then
     local host_modules=""
@@ -126,15 +132,7 @@ preserve_runtime_dependencies() {
       fail "Files needs a node_modules link. Supply --ultimate-root /path/to/ultimate or keep the current installed Files folder."
     ln -s "$host_modules" "$staged/node_modules"
   elif [[ "$ext" == "terminal" ]]; then
-    if ((WITH_DEPS)); then
-      info "deps" "Installing Terminal native dependencies in staged copy"
-      (cd "$staged" && npm ci)
-      if [[ "$(uname -s)" == "Darwin" ]]; then
-        (cd "$staged/node_modules/node-pty" && npm exec --yes --package=node-gyp@13.1.0 -- node-gyp rebuild)
-      fi
-    else
-      fail "Terminal node_modules are missing at $target. Re-run with --with-deps to build them explicitly."
-    fi
+    fail "Terminal node_modules are missing at $target. Re-run with --with-deps to build them explicitly."
   fi
 }
 
@@ -220,7 +218,11 @@ rollback_snapshot() {
     after="$backup/after/$scope/$ext"
 
     if [[ "$state" == "present" && ! -d "$before" ]]; then
-      fail "Backup payload is missing for $scope/$ext; left current target untouched"
+      if [[ -e "$target" || -L "$target" ]]; then
+        info "unchanged" "$target was not moved before the failed install"
+        continue
+      fi
+      fail "Backup payload is missing for $scope/$ext and the original target is absent"
     fi
     if [[ -e "$target" || -L "$target" ]]; then
       mkdir -p "$(dirname "$after")"
@@ -283,7 +285,8 @@ if [[ -n "$PROJECT_ROOT" && -d "$PROJECT_ROOT/.ultimate/extensions" ]]; then
 fi
 
 if (("${#TARGET_PATHS[@]}" == 0)); then
-  fail "No copy-installed extension targets found. Existing symlinks already point to the repository source."
+  info "current" "Every installed extension already links to the repository source; nothing to copy."
+  exit 0
 fi
 
 info "source" "$REPO_ROOT"
@@ -338,6 +341,7 @@ for i in "${!TARGET_PATHS[@]}"; do
   staged="$STAGE_ROOT/$scope/$ext"
   if [[ -d "$target" ]]; then state="present"; else state="absent"; fi
   printf '%s\t%s\t%s\n' "$scope" "$ext" "$state" >> "$BACKUP/manifest.tsv"
+  CHANGED=1
   if [[ "$state" == "present" ]]; then
     mkdir -p "$BACKUP/before/$scope"
     mv "$target" "$BACKUP/before/$scope/$ext"
@@ -345,7 +349,6 @@ for i in "${!TARGET_PATHS[@]}"; do
     mkdir -p "$(dirname "$target")"
   fi
   mv "$staged" "$target"
-  CHANGED=1
   info "installed" "$target"
 done
 
