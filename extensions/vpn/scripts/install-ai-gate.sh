@@ -8,8 +8,6 @@ CONFIG_DIR="$(cd "$(dirname "$CONFIG")" 2>/dev/null && pwd -P)" || {
 CONFIG="$CONFIG_DIR/$(basename "$CONFIG")"
 RULE_DIR="$CONFIG_DIR/rules"
 RULE_FILE="$RULE_DIR/ultimate-ai-services.list"
-PROVIDER_NAME="ultimate-ai-services"
-RULE_LINE="RULE-SET,$PROVIDER_NAME,AI-GATE"
 API="${MIHOMO_API_URL:-http://127.0.0.1:9090}"
 YQ="${YQ:-$(command -v yq 2>/dev/null || true)}"
 MIHOMO_BIN="${MIHOMO_BIN:-$(command -v mihomo 2>/dev/null || true)}"
@@ -102,6 +100,7 @@ fi
 [[ -f "$CONFIG" ]] || fail "Config not found: $CONFIG"
 [[ ! -L "$CONFIG" ]] || fail "Config path is a symlink; resolve it explicitly before installation"
 [[ ! -L "$RULE_FILE" ]] || fail "AI rule file path is a symlink; inspect it before installation"
+[[ ! -L "$RULE_DIR" ]] || fail "AI rules directory is a symlink; inspect it before installation"
 [[ ! -L "$BACKUP_ROOT" ]] || fail "AI Gate backup path is a symlink; inspect it before installation"
 [[ -n "$YQ" && -x "$YQ" ]] || fail "Install Mike Farah yq v4: brew install yq"
 [[ -n "$MIHOMO_BIN" && -x "$MIHOMO_BIN" ]] || fail "Mihomo executable not found; set MIHOMO_BIN"
@@ -111,6 +110,8 @@ fi
 curl -fsS --max-time 5 "$API/version" >/dev/null || fail "Mihomo API is unavailable at $API"
 "$YQ" -e '.proxy-groups[] | select(.name == "PROXY" and .type == "select")' "$CONFIG" >/dev/null ||
   fail "Could not find a manual PROXY selector in $CONFIG"
+"$YQ" -e '.proxy-groups[] | select(.name == "PROXY" and (.use | length > 0))' "$CONFIG" >/dev/null ||
+  fail "PROXY must reference one or more subscription providers under use"
 LAST_RULE="$("$YQ" -r '.rules[-1] // ""' "$CONFIG")"
 [[ "$LAST_RULE" == MATCH,* ]] || fail "The final rule must be MATCH,...; refusing to reorder an unknown rule set"
 PROXY_USE="$("$YQ" -o=yaml -r '.proxy-groups[] | select(.name == "PROXY") | .use // []' "$CONFIG")"
@@ -178,7 +179,7 @@ DOMAIN-SUFFIX,perplexity.ai
 DOMAIN-SUFFIX,openrouter.ai
 RULES
 
-PROXY_USE="$PROXY_USE" "$YQ" -i '
+"$YQ" -i '
   (.proxy-groups[] | select(.name == "PROXY") | .use) as $proxy_use
   | .proxy-groups |= (
     map(
@@ -197,6 +198,7 @@ PROXY_USE="$PROXY_USE" "$YQ" -i '
     ]
   )
   | .mode = "rule"
+  | .["rule-providers"] = (.["rule-providers"] // {})
   | .["rule-providers"]["ultimate-ai-services"] = {
       "type":"file",
       "behavior":"classical",
