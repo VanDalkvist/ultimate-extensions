@@ -6,6 +6,7 @@ import type { Snapshot } from './contracts.ts'
 export const SnapshotAction = actionRef<null, Snapshot>('vpn', 'snapshot')
 const SelectAction = actionRef<{ node: string }, Snapshot>('vpn', 'select')
 const PowerAction = actionRef<{ enabled: boolean }, Snapshot>('vpn', 'power')
+const AiPowerAction = actionRef<{ enabled: boolean }, Snapshot>('vpn', 'aiPower')
 const ProbeAction = actionRef<null, Record<string, number | null>>('vpn', 'probe')
 
 export function useVpn(open: () => boolean) {
@@ -42,7 +43,8 @@ export function useVpn(open: () => boolean) {
       await api.action(SelectAction, { node }, { conversationId: ROOT })
       setProbed({})
     }),
-    power: () => run(() => api.action(PowerAction, { enabled: !status.data()?.enabled }, { conversationId: ROOT })),
+    power: () => run(() => api.action(PowerAction, { enabled: status.data()?.generalGate?.selected !== 'PROXY' }, { conversationId: ROOT })),
+    aiPower: () => run(() => api.action(AiPowerAction, { enabled: status.data()?.aiGate?.selected !== 'PROXY' }, { conversationId: ROOT })),
     probe: () => run(async () => setProbed(await api.action(ProbeAction, null, { conversationId: ROOT }))),
     refresh: () => run(() => status.refetch()),
     nodeDelay: (name: string, history: number | null) => Object.hasOwn(probed(), name) ? probed()[name] ?? null : history,
