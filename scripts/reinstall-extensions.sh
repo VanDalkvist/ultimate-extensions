@@ -61,7 +61,7 @@ done
 SOURCE_DIR="$REPO_ROOT/scripts/reinstall-extensions"
 source "$SOURCE_DIR/source-preflight.sh"
 source "$SOURCE_DIR/backup-rollback.sh"
-preflight_target_roots
+preflight_global_roots
 
 if [[ "$MODE" == "list" ]]; then list_backups; exit 0; fi
 if [[ "$MODE" == "rollback" ]]; then rollback_snapshot "$BACKUP_ID"; exit 0; fi
@@ -77,6 +77,7 @@ if [[ -n "$ULTIMATE_ROOT" ]]; then
   [[ -d "$ULTIMATE_ROOT" ]] || fail "Ultimate root does not exist: $ULTIMATE_ROOT"
   ULTIMATE_ROOT="$(cd "$ULTIMATE_ROOT" && pwd -P)"
 fi
+preflight_target_roots
 
 TARGET_SCOPES=()
 TARGET_NAMES=()
