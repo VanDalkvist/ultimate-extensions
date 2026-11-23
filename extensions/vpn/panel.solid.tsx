@@ -6,7 +6,7 @@ import { SegmentedControl, SegmentedControlItem } from '@/components/ui/segmente
 import { cn } from '@/sdk/solid'
 import type { VpnReader } from './readers.solid.tsx'
 import { SettingsAccess } from './settings.solid.tsx'
-import { gateRouteActive, modeLabel } from './presentation.ts'
+import { aiRouteActive, gateRouteActive, modeLabel } from './presentation.ts'
 
 export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
   const [chosen, setChosen] = createSignal<string | null>(null)
@@ -22,7 +22,8 @@ export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
   const currentMode = () => props.vpn.status.data()?.mode
   const rulesActive = () => currentMode() === 'rule'
   const generalOn = () => gateRouteActive(currentMode(), props.vpn.status.data()?.generalGate?.selected, 'PROXY')
-  const aiOn = () => gateRouteActive(currentMode(), props.vpn.status.data()?.aiGate?.selected, 'AI-NODES')
+  const aiOn = () => aiRouteActive(currentMode(), props.vpn.status.data()?.aiGate?.selected, props.vpn.status.data()?.aiNodes?.selected, props.vpn.status.data()?.aiNodes?.options)
+  const aiNodeReady = () => !!props.vpn.status.data()?.aiNodes?.selected && !!props.vpn.status.data()?.aiNodes?.options.includes(props.vpn.status.data()!.aiNodes!.selected!)
   return (
     <section aria-label="Управление VPN" class="flex max-h-[min(520px,80dvh)] flex-col gap-3 p-3 text-xs" data-vpn-panel>
       <header class="flex shrink-0 items-center justify-between gap-2">
@@ -48,10 +49,11 @@ export function VpnPanel(props: { vpn: VpnReader; close: () => void }) {
         </div>
         <div class="rounded-md border border-border p-2.5 space-y-2">
           <div class="flex items-center justify-between gap-2"><span class="flex items-center gap-1.5 font-medium"><Bot class="size-3.5" />Нейросети</span>
-            <Button class="h-7 gap-1.5 px-2 text-xs" disabled={blocked() || !props.vpn.status.data()?.aiGate} onClick={() => props.vpn.aiPower()} size={null} variant={aiOn() ? 'default' : 'outline'}><Power class="size-3.5" />{aiOn() ? 'Защищены' : rulesActive() ? 'Заблокированы' : 'Восстановить защиту'}</Button>
+            <Button class="h-7 gap-1.5 px-2 text-xs" disabled={blocked() || !props.vpn.status.data()?.aiGate || (!aiOn() && !aiNodeReady())} onClick={() => props.vpn.aiPower()} size={null} variant={aiOn() ? 'default' : 'outline'}><Power class="size-3.5" />{aiOn() ? 'Защищены' : rulesActive() ? 'Заблокированы' : 'Восстановить защиту'}</Button>
           </div>
           <p class="text-[11px] text-muted-foreground">AI-сервисы используют отдельную группу узлов из VPN-подписок. DIRECT и статический shopproxy исключены.</p>
           <p class="text-[11px] text-muted-foreground">AI-узел: {props.vpn.status.data()?.aiProxy ?? 'Нет выбранного узла'}</p>
+          <Show when={!aiNodeReady()}><p class="text-[11px] text-warning" role="status">В AI-NODES нет доступных узлов подписки. Запросы к нейросетям останутся заблокированы.</p></Show>
         </div>
         <div class="flex shrink-0 items-start gap-3"><p class="min-w-0 flex-1 leading-relaxed break-words">{active() ?? 'Сервер не выбран'}</p></div>
         <Show when={providers().length} fallback={<p class="py-5 text-muted-foreground">В группе нет серверов. Настройки Mihomo остаются без изменений.</p>}>
