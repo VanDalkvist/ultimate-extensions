@@ -159,3 +159,42 @@ test('rollback rejects traversal or unknown extension names in a modified manife
   assert.match(rollback.stderr, /Invalid extension name/)
   assert.equal(readFileSync(join(victim, 'keep.txt'), 'utf8'), 'untouched')
 })
+
+test('rollback validates the full manifest before restoring the first extension', t => {
+  const f = fixture(t)
+  const result = run(['--apply'], f.env)
+  assertOk(result)
+  const backupLine = result.stdout.split('\\n').find(line => line.startsWith('[backup] '))
+  assert.ok(backupLine, result.stdout)
+  const backupRoot = backupLine.slice('[backup] '.length)
+  const current = join(f.ultimateHome, 'extensions', 'files')
+  const deployedReadme = readFileSync(join(current, 'README.md'), 'utf8')
+  writeFileSync(join(backupRoot, 'manifest.tsv'),
+    'global\\tfiles\\tpresent\\nglobal\\t../../victim\\tpresent\\n')
+
+  const rollback = run(['--rollback', backupRoot.split('/').at(-1)], f.env)
+  assert.notEqual(rollback.status, 0)
+  assert.match(rollback.stderr, /malformed or contains duplicate\\/unknown entries/)
+  assert.equal(readFileSync(join(current, 'README.md'), 'utf8'), deployedReadme)
+  assert.equal(existsSync(join(backupRoot, 'before', 'global', 'files', 'old-install.txt')), true)
+})
+
+test('symlinked global extension root aborts before deployment', t => {
+  const f = fixture(t)
+  const root = join(f.ultimateHome, 'extensions')
+  const moved = join(f.ultimateHome, 'extensions-original')
+  const external = join(f.root, 'external-extensions')
+  mkdirSync(external)
+  writeFileSync(join(external, 'sentinel.txt'), 'external-data')
+  rmSync(root, { recursive: true, force: true })
+  mkdirSync(moved, { recursive: true })
+  writeFileSync(join(moved, 'sentinel.txt'), 'original-data')
+  symlinkSync(external, root, 'dir')
+
+  const result = run(['--apply'], f.env)
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /extensions root.*symlink/)
+  assert.equal(readFileSync(join(external, 'sentinel.txt'), 'utf8'), 'external-data')
+  assert.equal(readFileSync(join(moved, 'sentinel.txt'), 'utf8'), 'original-data')
+  assert.equal(existsSync(join(f.ultimateHome, '.extension-backups')), false)
+})
