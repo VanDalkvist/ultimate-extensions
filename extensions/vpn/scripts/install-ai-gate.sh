@@ -1,40 +1,157 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Install the AI/GENERAL traffic gates into an existing Mihomo configuration.
+# A unique config-local backup is created; --rollback restores that exact snapshot.
+set -Eeuo pipefail
+umask 077
 
 CONFIG="${MIHOMO_CONFIG_PATH:-/opt/homebrew/etc/mihomo/config.yaml}"
-RULE_DIR="${MIHOMO_RULE_DIR:-/opt/homebrew/etc/mihomo/rules}"
-RULE_FILE="$RULE_DIR/ai-services.list"
+CONFIG_DIR="$(cd "$(dirname "$CONFIG")" 2>/dev/null && pwd -P)" || {
+  echo "[error] Configuration directory does not exist: $(dirname "$CONFIG")" >&2; exit 1;
+}
+CONFIG="$CONFIG_DIR/$(basename "$CONFIG")"
+RULE_DIR="$CONFIG_DIR/rules"
+RULE_FILE="$RULE_DIR/ultimate-ai-services.list"
+PROVIDER_NAME="ultimate-ai-services"
+RULE_LINE="RULE-SET,$PROVIDER_NAME,AI-GATE"
 API="${MIHOMO_API_URL:-http://127.0.0.1:9090}"
-YQ="${YQ:-yq}"
+YQ="${YQ:-$(command -v yq 2>/dev/null || true)}"
+MIHOMO_BIN="${MIHOMO_BIN:-$(command -v mihomo 2>/dev/null || true)}"
+BACKUP_ROOT="$CONFIG_DIR/.ai-gate-backups"
+STARTED=0
+COMMITTED=0
+YAML_TMP=""
+RULE_TMP=""
+BACKUP_DIR=""
 
-if [[ ! -f "$CONFIG" ]]; then echo "Config not found: $CONFIG" >&2; exit 1; fi
-if ! command -v "$YQ" >/dev/null 2>&1; then
-  echo "Install Mike Farah yq v4 first: brew install yq" >&2
-  exit 1
-fi
-if ! "$YQ" --version | grep -Eq 'version v?4\.'; then
-  echo "Mike Farah yq v4 is required." >&2; exit 1
-fi
-if ! "$YQ" -e '.proxy-groups[] | select(.name == "PROXY" and .type == "select")' "$CONFIG" >/dev/null; then
-  echo "Could not find a manual PROXY selector in $CONFIG. No changes made." >&2; exit 1
-fi
-if ! curl -fsS "$API/version" >/dev/null; then
-  echo "Mihomo API is unavailable at $API. Start Mihomo before installing." >&2; exit 1
+fail() { echo "[error] $*" >&2; exit 1; }
+sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
+
+api_reload() {
+  curl -sS --max-time 10 -o /dev/null -w '%{http_code}' \
+    -X PUT "$API/configs?force=true" \
+    -H 'Content-Type: application/json' \
+    -d '{"path":"","payload":""}' 2>/dev/null || true
+}
+
+restore_live_files() {
+  [[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" ]] || return 0
+  local restore_tmp=""
+  if [[ -f "$BACKUP_DIR/config.yaml" ]]; then
+    restore_tmp="$(mktemp "$CONFIG_DIR/.config.ai-gate-restore.XXXXXX")"
+    cp -p "$BACKUP_DIR/config.yaml" "$restore_tmp"
+    mv -f "$restore_tmp" "$CONFIG"
+  fi
+  if [[ -f "$BACKUP_DIR/rule-existed" ]] && [[ "$(cat "$BACKUP_DIR/rule-existed")" == "yes" ]]; then
+    [[ -f "$BACKUP_DIR/ultimate-ai-services.list" ]] || {
+      echo "[error] Backup rule file is missing: $BACKUP_DIR/ultimate-ai-services.list" >&2
+      return 1
+    }
+    mkdir -p "$RULE_DIR"
+    restore_tmp="$(mktemp "$RULE_DIR/.ai-gate-restore.XXXXXX")"
+    cp -p "$BACKUP_DIR/ultimate-ai-services.list" "$restore_tmp"
+    mv -f "$restore_tmp" "$RULE_FILE"
+  else
+    rm -f "$RULE_FILE"
+  fi
+  local status
+  status="$(api_reload)"
+  if [[ "$status" != "204" ]]; then
+    echo "[warning] Files restored, but Mihomo did not reload the old config (HTTP $status). Restart Mihomo after checking its log." >&2
+    return 1
+  fi
+  return 0
+}
+
+cleanup() {
+  local status=$?
+  trap - EXIT
+  [[ -z "$YAML_TMP" ]] || rm -f "$YAML_TMP"
+  [[ -z "$RULE_TMP" ]] || rm -f "$RULE_TMP"
+  if ((STARTED && !COMMITTED)); then
+    echo "[recovery] Installation did not complete. Restoring original config and rule file." >&2
+    restore_live_files || echo "[warning] Automatic reload/restore needs manual attention. Backup: $BACKUP_DIR" >&2
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+
+if [[ "${1:-}" == "--rollback" ]]; then
+  [[ $# -eq 2 ]] || fail "Usage: $0 --rollback <backup-id>"
+  BACKUP_ID="$2"
+  [[ "$BACKUP_ID" =~ ^[A-Za-z0-9._-]+$ ]] || fail "Invalid backup ID"
+  BACKUP_DIR="$BACKUP_ROOT/$BACKUP_ID"
+  [[ -d "$BACKUP_DIR" && -f "$BACKUP_DIR/manifest" ]] || fail "AI Gate backup not found: $BACKUP_ID"
+  [[ ! -f "$BACKUP_DIR/ROLLED_BACK" ]] || fail "This backup was already rolled back"
+  [[ -f "$BACKUP_DIR/config.yaml" && -f "$BACKUP_DIR/rule-existed" ]] || fail "Backup is incomplete"
+
+  EXPECTED_CONFIG="$(awk -F= '$1=="installed_config_sha256" {print $2}' "$BACKUP_DIR/manifest")"
+  EXPECTED_RULE="$(awk -F= '$1=="installed_rule_sha256" {print $2}' "$BACKUP_DIR/manifest")"
+  [[ -n "$EXPECTED_CONFIG" && -n "$EXPECTED_RULE" ]] || fail "Backup manifest has no installed file hashes"
+  [[ -f "$CONFIG" ]] || fail "Current Mihomo config is missing: $CONFIG"
+  [[ "$(sha256 "$CONFIG")" == "$EXPECTED_CONFIG" ]] ||
+    fail "Mihomo config changed since AI Gate installation. Review it manually before rollback."
+  [[ -f "$RULE_FILE" && "$(sha256 "$RULE_FILE")" == "$EXPECTED_RULE" ]] ||
+    fail "AI rule file changed since installation. Review it manually before rollback."
+
+  STARTED=1
+  restore_live_files
+  date -u '+%Y-%m-%dT%H:%M:%SZ' > "$BACKUP_DIR/ROLLED_BACK"
+  COMMITTED=1
+  echo "[done] Restored original Mihomo config and AI rules from $BACKUP_DIR"
+  exit 0
 fi
 
-mkdir -p "$RULE_DIR"
-STAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP="$CONFIG.backup-ai-gate-$STAMP"
-RULE_BACKUP=""
-cp -p "$CONFIG" "$BACKUP"
+[[ $# -eq 0 ]] || fail "Usage: $0 [--rollback <backup-id>]"
+[[ -f "$CONFIG" ]] || fail "Config not found: $CONFIG"
+[[ -n "$YQ" && -x "$YQ" ]] || fail "Install Mike Farah yq v4: brew install yq"
+[[ -n "$MIHOMO_BIN" && -x "$MIHOMO_BIN" ]] || fail "Mihomo executable not found; set MIHOMO_BIN"
+"$YQ" --version | grep -Eq 'version v?4\.' || fail "Mike Farah yq v4 is required"
+[[ -w "$CONFIG" && -w "$CONFIG_DIR" ]] || fail "No write access to $CONFIG. Run with sudo while preserving MIHOMO_CONFIG_PATH/YQ/MIHOMO_BIN."
+[[ "$API" =~ ^http://(127\.0\.0\.1|localhost):[0-9]+$ ]] || fail "MIHOMO_API_URL must be a loopback HTTP origin such as http://127.0.0.1:9090"
+curl -fsS --max-time 5 "$API/version" >/dev/null || fail "Mihomo API is unavailable at $API"
+
+# Require the existing PROXY to be the manual selector that owns provider nodes.
+"$YQ" -e '.proxy-groups[] | select(.name == "PROXY" and .type == "select")' "$CONFIG" >/dev/null ||
+  fail "Could not find a manual PROXY selector in $CONFIG"
+LAST_RULE="$("$YQ" -r '.rules[-1] // ""' "$CONFIG")"
+[[ "$LAST_RULE" == MATCH,* ]] || fail "The final rule must be MATCH,...; refusing to reorder an unknown rule set"
+
+# Existing names are accepted only when they already have this exact gate contract.
+for group in GENERAL-GATE AI-GATE; do
+  COUNT="$("$YQ" -r "[.proxy-groups[]? | select(.name == \"$group\")] | length" "$CONFIG")"
+  if [[ "$COUNT" != "0" ]]; then
+    if [[ "$group" == "GENERAL-GATE" ]]; then
+      "$YQ" -e '.proxy-groups[] | select(.name == "GENERAL-GATE" and .type == "select" and .proxies == ["PROXY", "DIRECT"])' "$CONFIG" >/dev/null ||
+        fail "A different group already uses GENERAL-GATE; rename it manually before installing"
+    else
+      "$YQ" -e '.proxy-groups[] | select(.name == "AI-GATE" and .type == "select" and .proxies == ["PROXY", "REJECT"])' "$CONFIG" >/dev/null ||
+        fail "A different group already uses AI-GATE; rename it manually before installing"
+    fi
+  fi
+done
+PROVIDER_EXISTS="$("$YQ" -r '.["rule-providers"] // {} | has("ultimate-ai-services")' "$CONFIG")"
+if [[ "$PROVIDER_EXISTS" == "true" ]]; then
+  "$YQ" -e '.["rule-providers"]["ultimate-ai-services"] == {"type":"file","behavior":"classical","format":"text","path":"./rules/ultimate-ai-services.list"}' "$CONFIG" >/dev/null ||
+    fail "A different rule-provider already uses the name ultimate-ai-services"
+fi
+
+STAMP="$(date '+%Y%m%d-%H%M%S')-$$-$RANDOM"
+mkdir -p "$BACKUP_ROOT" "$RULE_DIR"
+BACKUP_DIR="$BACKUP_ROOT/$STAMP"
+mkdir "$BACKUP_DIR"
+cp -p "$CONFIG" "$BACKUP_DIR/config.yaml"
 if [[ -f "$RULE_FILE" ]]; then
-  RULE_BACKUP="$RULE_FILE.backup-ai-gate-$STAMP"
-  cp -p "$RULE_FILE" "$RULE_BACKUP"
+  printf 'yes\n' > "$BACKUP_DIR/rule-existed"
+  cp -p "$RULE_FILE" "$BACKUP_DIR/ultimate-ai-services.list"
+else
+  printf 'no\n' > "$BACKUP_DIR/rule-existed"
 fi
-TMP=$(mktemp)
-trap 'rm -f "$TMP"' EXIT
 
-cat > "$TMP" <<'RULES'
+YAML_TMP="$(mktemp "$CONFIG_DIR/.config.ai-gate.XXXXXX")"
+RULE_TMP="$(mktemp "$RULE_DIR/.ultimate-ai-services.XXXXXX")"
+cp -p "$CONFIG" "$YAML_TMP"
+
+cat > "$RULE_TMP" <<'RULES'
 # OpenAI / ChatGPT / Codex
 DOMAIN-SUFFIX,openai.com
 DOMAIN-SUFFIX,chatgpt.com
@@ -57,9 +174,6 @@ DOMAIN-SUFFIX,perplexity.ai
 DOMAIN-SUFFIX,openrouter.ai
 RULES
 
-# Work on a temporary YAML, validate it, then atomically replace the original.
-YAML_TMP=$(mktemp "${CONFIG}.ai-gate.XXXXXX")
-cp "$CONFIG" "$YAML_TMP"
 "$YQ" -i '
   .proxy-groups |= (
     map(
@@ -70,58 +184,56 @@ cp "$CONFIG" "$YAML_TMP"
       else .
       end
     )
-    | map(select(.name != "GENERAL-GATE" and .name != "AI-GATE"))
-    + [
-      {"name":"GENERAL-GATE","type":"select","proxies":["PROXY","DIRECT"]},
-      {"name":"AI-GATE","type":"select","proxies":["PROXY","REJECT"]}
-    ]
+    | (if any(.[]; .name == "GENERAL-GATE") then . else . + [{"name":"GENERAL-GATE","type":"select","proxies":["PROXY","DIRECT"]}] end)
+    | (if any(.[]; .name == "AI-GATE") then . else . + [{"name":"AI-GATE","type":"select","proxies":["PROXY","REJECT"]}] end)
   )
   | .mode = "rule"
-  | .rule-providers."ai-services" = {
+  | .["rule-providers"]["ultimate-ai-services"] = {
       "type":"file",
       "behavior":"classical",
       "format":"text",
-      "path":"./rules/ai-services.list"
+      "path":"./rules/ultimate-ai-services.list"
     }
-  | .rules |= (
-      map(select(. != "MATCH,PROXY" and . != "MATCH,GENERAL-GATE" and . != "RULE-SET,ai-services,AI-GATE"))
-      + ["RULE-SET,ai-services,AI-GATE","MATCH,GENERAL-GATE"]
-    )
+  | .rules = (["RULE-SET,ultimate-ai-services,AI-GATE"] + ((.rules // []) | map(select(. != "RULE-SET,ultimate-ai-services,AI-GATE"))))
 ' "$YAML_TMP"
 
-if ! "$YQ" -e '.proxy-groups[] | select(.name == "PROXY" and .type == "select")' "$YAML_TMP" >/dev/null; then
-  echo "PROXY must be a manual select group. Aborting." >&2
-  rm -f "$YAML_TMP"; exit 1
-fi
-if ! "$YQ" -e '.proxy-groups[] | select(.name == "AI-GATE" and (.proxies | index("DIRECT") == null) and (.proxies | index("REJECT") != null))' "$YAML_TMP" >/dev/null; then
-  echo "AI-GATE validation failed. Aborting." >&2
-  rm -f "$YAML_TMP"; exit 1
-fi
+# Preserve original file mode after yq writes the staged YAML.
+chmod "$(stat -f '%Lp' "$CONFIG")" "$YAML_TMP"
 
-cp "$TMP" "$RULE_FILE"
-if ! mihomo -t -d "$(dirname "$CONFIG")" >/dev/null; then
-  cp "$BACKUP" "$CONFIG"
-  [[ -n "$RULE_BACKUP" ]] && cp "$RULE_BACKUP" "$RULE_FILE"
-  rm -f "$YAML_TMP"
-  echo "Mihomo config validation failed. Original config restored." >&2
-  exit 1
-fi
-cat "$YAML_TMP" > "$CONFIG"
-rm -f "$YAML_TMP"
+"$YQ" -e '.mode == "rule"' "$YAML_TMP" >/dev/null || fail "Staged config is not in rule mode"
+"$YQ" -e '.rules[0] == "RULE-SET,ultimate-ai-services,AI-GATE"' "$YAML_TMP" >/dev/null || fail "AI rule is not first"
+"$YQ" -e '(.rules[-1] | startswith("MATCH,"))' "$YAML_TMP" >/dev/null || fail "MATCH rule is no longer final"
+"$YQ" -e '.proxy-groups[] | select(.name == "PROXY" and .type == "select" and (.proxies | index("DIRECT") == null) and .["empty-fallback"] == "REJECT")' "$YAML_TMP" >/dev/null ||
+  fail "PROXY selector validation failed"
+"$YQ" -e '.proxy-groups[] | select(.name == "GENERAL-GATE" and .type == "select" and .proxies == ["PROXY","DIRECT"])' "$YAML_TMP" >/dev/null ||
+  fail "GENERAL-GATE validation failed"
+"$YQ" -e '.proxy-groups[] | select(.name == "AI-GATE" and .type == "select" and .proxies == ["PROXY","REJECT"])' "$YAML_TMP" >/dev/null ||
+  fail "AI-GATE validation failed"
 
-HTTP=$(curl -sS -o /dev/null -w '%{http_code}' -X PUT "$API/configs?force=true" \
-  -H 'Content-Type: application/json' -d '{"path":"","payload":""}' || true)
-if [[ "$HTTP" != "204" ]]; then
-  cp "$BACKUP" "$CONFIG"
-  [[ -n "$RULE_BACKUP" ]] && cp "$RULE_BACKUP" "$RULE_FILE"
-  echo "Reload failed (HTTP $HTTP). Config and rules restored from backup. Restart Mihomo manually after checking logs." >&2
-  exit 1
-fi
+# Install the referenced local rule file before Mihomo validates the staged YAML.
+STARTED=1
+mv -f "$RULE_TMP" "$RULE_FILE"
+RULE_TMP=""
+"$MIHOMO_BIN" -t -d "$CONFIG_DIR" -f "$YAML_TMP" >/dev/null || fail "Mihomo rejected the staged config; original files will be restored"
 
-echo "AI Gate installed."
-echo "Config backup: $BACKUP"
-[[ -n "$RULE_BACKUP" ]] && echo "Previous rule backup: $RULE_BACKUP"
-echo "AI rules: $RULE_FILE"
-echo "Groups: PROXY (VPN nodes), GENERAL-GATE (PROXY/DIRECT), AI-GATE (PROXY/REJECT)"
-echo "Global Mihomo mode remains rule. AI Gate starts ON (PROXY)."
-echo "Use Ultimate VPN extension branch feat/ai-traffic-gate for independent toggles."
+mv -f "$YAML_TMP" "$CONFIG"
+YAML_TMP=""
+HTTP="$(api_reload)"
+[[ "$HTTP" == "204" ]] || fail "Mihomo reload returned HTTP $HTTP; original files will be restored"
+
+CONFIG_SHA="$(sha256 "$CONFIG")"
+RULE_SHA="$(sha256 "$RULE_FILE")"
+{
+  printf 'backup_id=%s\n' "$STAMP"
+  printf 'rule_existed=%s\n' "$(cat "$BACKUP_DIR/rule-existed")"
+  printf 'installed_config_sha256=%s\n' "$CONFIG_SHA"
+  printf 'installed_rule_sha256=%s\n' "$RULE_SHA"
+} > "$BACKUP_DIR/manifest"
+COMMITTED=1
+
+echo "[done] AI Gate installed and Mihomo reloaded."
+echo "[backup] $BACKUP_DIR"
+echo "[rollback] sudo env MIHOMO_CONFIG_PATH='$CONFIG' bash $0 --rollback '$STAMP'"
+echo "[groups] PROXY (proxy nodes), GENERAL-GATE (PROXY/DIRECT), AI-GATE (PROXY/REJECT)"
+echo "[rules] AI domain rule inserted first; existing remaining rule order preserved."
+echo "[note] AI Gate only enforces matching rules while Mihomo is in rule mode and has a functioning route."
