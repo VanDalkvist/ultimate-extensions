@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
-
 CONFIG="${MIHOMO_CONFIG_PATH:-/opt/homebrew/etc/mihomo/config.yaml}"
 CONFIG_DIR="$(cd "$(dirname "$CONFIG")" 2>/dev/null && pwd -P)" || {
   echo "[error] Configuration directory does not exist: $(dirname "$CONFIG")" >&2; exit 1;
@@ -20,17 +19,14 @@ COMMITTED=0
 YAML_TMP=""
 RULE_TMP=""
 BACKUP_DIR=""
-
 fail() { echo "[error] $*" >&2; exit 1; }
 sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
-
 api_reload() {
   curl -sS --max-time 10 -o /dev/null -w '%{http_code}' \
     -X PUT "$API/configs?force=true" \
     -H 'Content-Type: application/json' \
     -d '{"path":"","payload":""}' 2>/dev/null || true
 }
-
 restore_live_files() {
   [[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" ]] || return 1
   local restore_tmp=""
@@ -69,7 +65,6 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT
-
 if [[ "${1:-}" == "--rollback" ]]; then
   [[ $# -eq 2 ]] || fail "Usage: $0 --rollback <backup-id>"
   BACKUP_ID="$2"
@@ -81,7 +76,6 @@ if [[ "${1:-}" == "--rollback" ]]; then
   if [[ "$(cat "$BACKUP_DIR/rule-existed")" == "yes" ]]; then
     [[ -f "$BACKUP_DIR/ultimate-ai-services.list" ]] || fail "Backup AI rule file is missing"
   fi
-
   EXPECTED_CONFIG="$(awk -F= '$1=="installed_config_sha256" {print $2}' "$BACKUP_DIR/manifest")"
   EXPECTED_RULE="$(awk -F= '$1=="installed_rule_sha256" {print $2}' "$BACKUP_DIR/manifest")"
   [[ -n "$EXPECTED_CONFIG" && -n "$EXPECTED_RULE" ]] || fail "Backup manifest has no installed file hashes"
@@ -90,7 +84,6 @@ if [[ "${1:-}" == "--rollback" ]]; then
     fail "Mihomo config changed since AI Gate installation. Review it manually before rollback."
   [[ -f "$RULE_FILE" && "$(sha256 "$RULE_FILE")" == "$EXPECTED_RULE" ]] ||
     fail "AI rule file changed since installation. Review it manually before rollback."
-
   STARTED=1
   if restore_live_files; then
     date -u '+%Y-%m-%dT%H:%M:%SZ' > "$BACKUP_DIR/ROLLED_BACK"
@@ -105,7 +98,6 @@ if [[ "${1:-}" == "--rollback" ]]; then
   fi
   fail "Rollback could not restore the original files. Backup remains at $BACKUP_DIR"
 fi
-
 [[ $# -eq 0 ]] || fail "Usage: $0 [--rollback <backup-id>]"
 [[ -f "$CONFIG" ]] || fail "Config not found: $CONFIG"
 [[ ! -L "$CONFIG" ]] || fail "Config path is a symlink; resolve it explicitly before installation"
@@ -117,16 +109,13 @@ fi
 [[ -w "$CONFIG" && -w "$CONFIG_DIR" ]] || fail "No write access to $CONFIG. Run with sudo while preserving MIHOMO_CONFIG_PATH/YQ/MIHOMO_BIN."
 [[ "$API" =~ ^http://(127\.0\.0\.1|localhost):[0-9]+$ ]] || fail "MIHOMO_API_URL must be a loopback HTTP origin such as http://127.0.0.1:9090"
 curl -fsS --max-time 5 "$API/version" >/dev/null || fail "Mihomo API is unavailable at $API"
-
 "$YQ" -e '.proxy-groups[] | select(.name == "PROXY" and .type == "select")' "$CONFIG" >/dev/null ||
   fail "Could not find a manual PROXY selector in $CONFIG"
 LAST_RULE="$("$YQ" -r '.rules[-1] // ""' "$CONFIG")"
 [[ "$LAST_RULE" == MATCH,* ]] || fail "The final rule must be MATCH,...; refusing to reorder an unknown rule set"
-
 PROXY_USE="$("$YQ" -o=yaml -r '.proxy-groups[] | select(.name == "PROXY") | .use // []' "$CONFIG")"
 [[ -n "$PROXY_USE" && "$PROXY_USE" != "[]" ]] || fail "PROXY must define provider references under use; AI-NODES only accepts provider-backed VPN nodes"
 export PROXY_USE
-
 for group in GENERAL-GATE AI-GATE; do
   COUNT="$("$YQ" -r "[.proxy-groups[]? | select(.name == \"$group\")] | length" "$CONFIG")"
   if [[ "$COUNT" != "0" ]]; then
