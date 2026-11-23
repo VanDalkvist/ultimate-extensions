@@ -368,3 +368,54 @@ Plan: `docs/superpowers/plans/2026-11-22-arch-improvement-cycle-8-post-solid-reg
 
 ### S10–S11 learning
 An upstream synchronization can silently roll back already merged product behavior when it overwrites entire extension directories and deletes tests. Treat a source-to-source sync as a *migration with a manifest of protected contracts*. Gate on both behavioral tests and installed-host verification, and verify installer prerequisites still exist before declaring a release. Do not bury product test unavailability behind source PASS.
+
+
+## Cycle 9 — 2026-11-24 — AI Gate safety boundary and collection installer
+
+Plan: `docs/superpowers/plans/2026-11-24-arch-improvement-cycle-9-ai-gate-and-reinstall.md`. Candidate: Draft PR #11, branch `feat/ai-traffic-gate`. The branch remains unmerged.
+
+### S0–S8 source review and implementation
+
+- Reviewed the baseline through `arch-rules-context`, `arch-rules-slice-planning`, `arch-rules-implementation-review`, and the `arch-improvement-loop` workflow. Baseline: `ai-meatbags/arch-rules`; no project-local pinned copy exists.
+- Inventory: six current extension folders — Files, right-panel-resize, subscription-usage, terminal, themes and VPN.
+- Added a staged collection installer: dry-run by default, explicit apply, optional existing project overrides, source/submodule preflight, same-filesystem staging, private backup, symlink refusal, native dependency preservation, explicit dependency rebuild option and manifest-validated rollback.
+- Backup locations: `~/.ultimate/.extension-backups/<id>`; project override backups live in `<project>/.ultimate/.extension-backups/<id>`. Rollback retains the replaced versions under each backup's `after/` folder.
+- Added filesystem tests for dry-run, all six extension copies, project override, preservation of Files dependency link, Terminal node-pty payload and Usage SQLite, foreign symlink refusal, source-linked no-op, rollback and manifest path-traversal refusal.
+- Added a separate Mihomo config installer with config/rule backups, first-rule ordering, temporary-file validation via Mihomo `-t -d ... -f ...`, reload confirmation, hash-guarded rollback and symlink preflight.
+- Reworked AI routing into `AI-NODES` built from the same subscription providers as the user's `PROXY.use`. `AI-GATE` selects `AI-NODES` or `REJECT`. Static `shopproxy` and DIRECT remain outside AI-NODES; the regular PROXY/GENERAL-GATE path remains able to use the static proxy.
+- The VPN panel reports a route as active only when global mode is `rule` and its group points to the expected target. Selecting a provider node mirrors it into AI-NODES. Selecting static `shopproxy` leaves the previous subscription AI node selected.
+
+### Semantic probes (source inspection)
+
+- **Dependency traceability — PASS (source):** `VpnService` calls the injected `VpnPort` methods; `MihomoAdapter` maps them to concrete Mihomo API calls. No decorative port was found.
+- **Runtime completeness / split-brain — PASS (source):** the snapshot, service, adapter, controller, server action and Solid reader all expose the same AI group contract. No parallel AI controller implementation was introduced.
+- **Entry point wiring — PASS (source):** `server.ts` registers `aiPower`; controller composes MihomoClient → MihomoAdapter → VpnService; Solid reader calls the `aiPower` action.
+- **Anti-hollow / assertion integrity — PASS (test design):** tests assert actual group-selection API calls and selected-node state, including that static `shopproxy` does not become the AI node. The assertions have been authored but not run in this environment.
+
+### Findings and disposition
+
+- **P1 resolved:** the initial AI route inherited every option from PROXY, including the existing static HTTP `shopproxy` configured with `tls: false`. AI-NODES now imports only subscription providers and excludes static entries. Remaining requirement: verify the protocol types and actual egress of the provider nodes.
+- **P1 resolved (source):** selector-only UI state could say protected while Mihomo global mode was `direct`/ `global`. Route status now requires `rule` mode and the target selector.
+- **P2 resolved (source):** AI rule must precede existing direct/domain rules. Installer inserts it at index 0 and checks that the final MATCH rule remains last.
+- **P2 resolved (source):** config rollback must preserve an existing AI rule file or remove the newly created file when none existed. The installer backs up both and guards rollback with installed-file SHA-256 values.
+- **P2 addressed (source):** extension copies and project overrides have explicit backup manifests; destination symlinks are checked; Usage SQLite, browser drafts and native Terminal dependencies remain outside source replacement.
+- **P3:** AI installer is 249 LOC, just under the AP-019 hard threshold and near the threshold. Decompose its transaction helpers in a later bounded slice.
+- **Residual system boundary:** AI-GATE protects matching domains while Mihomo is alive, the TUN is active and global mode is `rule`. A Mihomo process crash/TUN teardown still needs an OS-level fail-closed mechanism; this cycle explicitly excludes PF/Network Extension integration.
+
+### S9 verification gate — BLOCKED
+
+- **Not run:** `node --test test/reinstall-extensions.test.mjs`.
+- **Not run:** `npm --prefix extensions/vpn test`.
+- **Not run:** `npm --prefix extensions/vpn run typecheck`.
+- **Not run:** `bash -n` over the installer scripts.
+- **Not run:** live Mihomo validation and reload against the user's real YAML.
+- **Not run:** real Ultimate Solid UI, macOS Network Extension/TUN, Terminal native PTY or project-override acceptance.
+
+The execution environment used for the GitHub source edits did not provide the user's local checkout/Mac runtime. Source-level wiring and test assertions were inspected; they are not evidence of executable green tests. The mandatory two-circuit Arch Loop result is therefore **BLOCKED**, and the draft PR must remain unmerged until commands above and a live smoke test pass.
+
+### S10–S11 lessons
+
+- A security-specific traffic gate should have its own proxy group sourced only from approved subscription providers. Reusing a general selector can silently inherit static or weaker transports.
+- A VPN UI badge must be derived from both global mode and selected route. Selector state alone can be stale while rules are bypassed.
+- For extension sync, source, personal installation and project override are separate versions. Preflight and backup all scopes before swapping; preserve each extension's runtime dependency boundary.
+- A rollback command should be manifest-bounded, repeat-safe and reject unexpected paths. Keep replaced versions under `after/` for forensic recovery.
