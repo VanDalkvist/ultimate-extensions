@@ -108,6 +108,9 @@ fi
 
 [[ $# -eq 0 ]] || fail "Usage: $0 [--rollback <backup-id>]"
 [[ -f "$CONFIG" ]] || fail "Config not found: $CONFIG"
+[[ ! -L "$CONFIG" ]] || fail "Config path is a symlink; resolve it explicitly before installation"
+[[ ! -L "$RULE_FILE" ]] || fail "AI rule file path is a symlink; inspect it before installation"
+[[ ! -L "$BACKUP_ROOT" ]] || fail "AI Gate backup path is a symlink; inspect it before installation"
 [[ -n "$YQ" && -x "$YQ" ]] || fail "Install Mike Farah yq v4: brew install yq"
 [[ -n "$MIHOMO_BIN" && -x "$MIHOMO_BIN" ]] || fail "Mihomo executable not found; set MIHOMO_BIN"
 "$YQ" --version | grep -Eq 'version v?4\.' || fail "Mike Farah yq v4 is required"
