@@ -226,7 +226,7 @@ COMMITTED=1
 
 echo "[done] AI Gate installed and Mihomo reloaded."
 echo "[backup] $BACKUP_DIR"
-printf '[rollback] sudo env MIHOMO_CONFIG_PATH=%q MIHOMO_API_URL=%q bash %q --rollback %q\\n' "$CONFIG" "$API" "$SCRIPT_PATH" "$STAMP"
+printf '[rollback] sudo env MIHOMO_CONFIG_PATH=%q MIHOMO_API_URL=%q bash %q --rollback %q\n' "$CONFIG" "$API" "$SCRIPT_PATH" "$STAMP"
 echo "[groups] PROXY (regular nodes + static proxies), AI-NODES (subscription providers only), GENERAL-GATE (PROXY/DIRECT), AI-GATE (AI-NODES/REJECT)"
 echo "[rules] AI domain rule inserted first; existing remaining rule order preserved."
 echo "[note] AI Gate only enforces matching rules while Mihomo is in rule mode and has a functioning route."
