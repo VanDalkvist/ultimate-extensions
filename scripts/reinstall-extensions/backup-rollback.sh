@@ -48,8 +48,12 @@ validate_rollback_manifest() {
     fi
     scope_backup="$(scope_backup_path "$backup" "$scope")"
     before="$scope_backup/before/$scope/$ext"
+    after="$scope_backup/after/$scope/$ext"
+    [[ ! -L "$scope_backup" && ! -L "$scope_backup/before" && ! -L "$scope_backup/before/$scope" && ! -L "$scope_backup/after" && ! -L "$scope_backup/after/$scope" ]] ||
+      fail "Backup directory tree contains a symlink: $scope_backup"
     [[ ! -L "$target" ]] || fail "Rollback target became a symlink: $target"
     [[ ! -L "$before" ]] || fail "Rollback backup entry is a symlink: $before"
+    [[ ! -e "$after" && ! -L "$after" ]] || fail "Rollback after-path already exists: $after"
     if [[ "$state" == "present" ]]; then
       [[ -d "$before" ]] || fail "Backup payload is missing for $scope/$ext"
     fi
@@ -81,14 +85,13 @@ rollback_snapshot() {
 
   local project_root=""
   [[ ! -f "$backup/project-root.txt" ]] || project_root="$(cat "$backup/project-root.txt")"
-  if [[ -n "$project_root" ]]; then
-    [[ "$project_root" == /* && "$project_root" != "/" ]] || fail "Invalid project root in backup metadata"
-  fi
   if grep -q '^project[[:space:]]' "$backup/manifest.tsv"; then
-    [[ ! -L "$project_root/.ultimate" && ! -L "$project_root/.ultimate/extensions" && ! -L "$project_root/.ultimate/.extension-backups" ]] ||
-      fail "Project .ultimate/extensions or backup root became a symlink"
     [[ -n "$project_root" && -d "$project_root" ]] ||
       fail "Original project root is missing; restore it first: $project_root"
+    [[ "$project_root" == /* && "$project_root" != "/" ]] || fail "Invalid project root in backup metadata"
+    [[ "$(cd "$project_root" && pwd -P)" == "$project_root" ]] || fail "Project root in backup metadata is not canonical"
+    [[ ! -L "$project_root/.ultimate" && ! -L "$project_root/.ultimate/extensions" && ! -L "$project_root/.ultimate/.extension-backups" ]] ||
+      fail "Project .ultimate/extensions or backup root became a symlink"
     [[ -d "$project_root/.ultimate/.extension-backups/${backup##*/}" && ! -L "$project_root/.ultimate/.extension-backups/${backup##*/}" ]] ||
       fail "Project backup payload is missing or linked under $project_root/.ultimate/.extension-backups"
   fi
