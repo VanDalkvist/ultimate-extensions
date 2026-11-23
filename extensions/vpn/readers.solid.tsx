@@ -2,6 +2,7 @@
 import { createSignal, onSettled } from 'solid-js'
 import { ROOT, actionRef, api, errorMessage, keepLast, useAction } from '@/sdk/solid'
 import type { Snapshot } from './contracts.ts'
+import { gateRouteActive } from './presentation.ts'
 
 export const SnapshotAction = actionRef<null, Snapshot>('vpn', 'snapshot')
 const SelectAction = actionRef<{ node: string }, Snapshot>('vpn', 'select')
@@ -43,8 +44,8 @@ export function useVpn(open: () => boolean) {
       await api.action(SelectAction, { node }, { conversationId: ROOT })
       setProbed({})
     }),
-    power: () => run(() => api.action(PowerAction, { enabled: status.data()?.generalGate?.selected !== 'PROXY' }, { conversationId: ROOT })),
-    aiPower: () => run(() => api.action(AiPowerAction, { enabled: status.data()?.aiGate?.selected !== 'PROXY' }, { conversationId: ROOT })),
+    power: () => run(() => api.action(PowerAction, { enabled: !gateRouteActive(status.data()?.mode, status.data()?.generalGate?.selected, 'PROXY') }, { conversationId: ROOT })),
+    aiPower: () => run(() => api.action(AiPowerAction, { enabled: !gateRouteActive(status.data()?.mode, status.data()?.aiGate?.selected, 'PROXY') }, { conversationId: ROOT })),
     probe: () => run(async () => setProbed(await api.action(ProbeAction, null, { conversationId: ROOT }))),
     refresh: () => run(() => status.refetch()),
     nodeDelay: (name: string, history: number | null) => Object.hasOwn(probed(), name) ? probed()[name] ?? null : history,
