@@ -419,3 +419,14 @@ The execution environment used for the GitHub source edits did not provide the u
 - A VPN UI badge must be derived from both global mode and selected route. Selector state alone can be stale while rules are bypassed.
 - For extension sync, source, personal installation and project override are separate versions. Preflight and backup all scopes before swapping; preserve each extension's runtime dependency boundary.
 - A rollback command should be manifest-bounded, repeat-safe and reject unexpected paths. Keep replaced versions under `after/` for forensic recovery.
+
+
+### Cycle 9 follow-up hardening
+
+- AI protection status now also requires a concrete selected node present in AI-NODES. A missing/empty AI provider group is rendered as unavailable/blocked, and the AI enable control is disabled until a provider node is selected.
+- The AI config installer refuses a second install while any owned gate/provider name already exists. This prevents a rerun from recreating selectors and resetting a user's GENERAL-GATE DIRECT or AI-GATE REJECT preference. Reinstall is an explicit rollback followed by a fresh apply.
+- Fixed AI rollback state initialization so strict Bash nounset mode handles failures before file restoration.
+- AI and collection installers now print absolute rollback commands with shell-escaped paths.
+- Collection rollback now validates the complete manifest, every extension name/scope/state, duplicate records, backup payloads, target symlinks and after-paths before moving the first installed extension. This prevents a later malformed row from causing a partial rollback.
+- Added filesystem test cases for multi-row manifest corruption and a symlinked global extensions root. These tests are authored but still not executed in this environment.
+
