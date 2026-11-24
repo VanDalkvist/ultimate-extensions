@@ -4,6 +4,11 @@ export type Mode = 'rule' | 'direct' | 'global'
 export type Issue = { code: IssueCode; message: string }
 export type Node = { name: string; type: string; delay: number | null }
 export type Provider = { id: string; name: string; nodes: Node[] }
+export const GENERAL_GATE = 'GENERAL-GATE' as const
+export const AI_GATE = 'AI-GATE' as const
+export const AI_NODES = 'AI-NODES' as const
+export type GateName = typeof GENERAL_GATE | typeof AI_GATE | typeof AI_NODES
+export type GateState = { selected: string | null; options: string[] }
 export type Snapshot = {
   issue: Issue | null
   /** Controller mode/selection hint only; never an assertion of traffic protection. */
@@ -14,12 +19,18 @@ export type Snapshot = {
   version: string | null
   group: string
   providers: Provider[]
+  generalGate: GateState | null
+  aiGate: GateState | null
+  aiNodes: GateState | null
+  aiProxy: string | null
 }
 export type Context = { signal: AbortSignal }
 export type VpnPort = {
   read(signal: AbortSignal): Promise<Snapshot>
   select(name: string, signal: AbortSignal): Promise<void>
   setMode(mode: 'rule' | 'direct', signal: AbortSignal): Promise<void>
+  setGate(group: typeof GENERAL_GATE | typeof AI_GATE, selected: 'PROXY' | 'DIRECT' | 'REJECT' | 'AI-NODES', signal: AbortSignal): Promise<void>
+  selectAiNode(name: string, signal: AbortSignal): Promise<void>
   probe(signal: AbortSignal): Promise<Record<string, number | null>>
 }
 
@@ -79,6 +90,19 @@ export function selector(value: unknown, group: string) {
     throw new VpnError('invalid', 'Группа VPN должна быть ручным селектором Mihomo')
   const selected = raw.now == null ? null : text(raw.now)
   return { selected, names: raw.all as string[] }
+}
+
+export function gateState(value: unknown, group: GateName): GateState | null {
+  const proxies = record(record(value).proxies)
+  const candidate = proxies[group]
+  if (candidate === undefined) return null
+  const raw = record(candidate)
+  if (raw.type !== 'Selector' || !Array.isArray(raw.all) || raw.all.some(v => typeof v !== 'string'))
+    return null
+  return {
+    selected: raw.now == null ? null : text(raw.now),
+    options: raw.all as string[],
+  }
 }
 
 export function noArgs(value: unknown) {

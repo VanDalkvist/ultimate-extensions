@@ -3,10 +3,12 @@ import { once } from 'node:events'
 
 export const NODE = '🇫🇮 Demo / Unicode [Test] · №1'
 export const SECOND = '🇩🇪 Germany — #2'
+export const SHOP = 'shopproxy'
 
 export async function fixture() {
   const state = {
-    mode: 'rule', selected: NODE, failure: '', failureMethod: '', failureCode: 503, malformed: false, empty: false,
+    mode: 'rule', selected: NODE, aiNode: NODE, general: 'PROXY', ai: 'AI-NODES',
+    failure: '', failureMethod: '', failureCode: 503, malformed: false, empty: false,
     calls: [] as { method: string; path: string; body: unknown }[],
   }
   const server = createServer(async (req, res) => {
@@ -16,19 +18,28 @@ export async function fixture() {
     const body = text ? JSON.parse(text) : null
     res.setHeader('content-type', 'application/json')
     if (path === '/__test') {
-      if (req.method === 'POST') for (const key of ['mode', 'selected', 'failure', 'failureMethod', 'failureCode', 'malformed', 'empty'] as const)
+      if (req.method === 'POST') for (const key of ['mode', 'selected', 'aiNode', 'general', 'ai', 'failure', 'failureMethod', 'failureCode', 'malformed', 'empty'] as const)
         if (key in body) Object.assign(state, { [key]: body[key] })
       res.end(JSON.stringify(state)); return
     }
     state.calls.push({ method: req.method!, path, body })
     if (state.failure === path && (!state.failureMethod || state.failureMethod === req.method)) { res.writeHead(state.failureCode).end('sensitive-upstream-detail'); return }
-    if (path === '/version') { res.end(JSON.stringify({ version: '1.19.32' })); return }
+    if (path === '/version') { res.end(JSON.stringify({ version: '1.19.34' })); return }
     if (path === '/configs' && req.method === 'PATCH') state.mode = body.mode
     if (path === '/proxies/PROXY' && req.method === 'PUT') state.selected = body.name
+    if (path === '/proxies/AI-NODES' && req.method === 'PUT') state.aiNode = body.name
+    if (path === '/proxies/GENERAL-GATE' && req.method === 'PUT') state.general = body.name
+    if (path === '/proxies/AI-GATE' && req.method === 'PUT') state.ai = body.name
     if (req.method !== 'GET') { res.writeHead(204).end(); return }
     const payload: Record<string, unknown> = {
       '/configs': { mode: state.mode, secret: 'not-exported', tun: { enable: true } },
-      '/proxies': { proxies: { PROXY: { type: 'Selector', now: state.selected, all: [NODE, SECOND] } } },
+      '/proxies': { proxies: {
+        PROXY: { type: 'Selector', now: state.selected, all: [NODE, SECOND, SHOP] },
+        'GENERAL-GATE': { type: 'Selector', now: state.general, all: ['PROXY', 'DIRECT'] },
+        'AI-GATE': { type: 'Selector', now: state.ai, all: ['AI-NODES', 'REJECT'] },
+        'AI-NODES': { type: 'Selector', now: state.aiNode, all: [NODE, SECOND] },
+        [SHOP]: { type: 'Http', history: [] },
+      } },
       '/providers/proxies': { providers: {
         personal: { name: 'Personal', vehicleType: 'HTTP', url: 'private-subscription', proxies: [
           { name: NODE, type: 'Trojan', alive: true, history: [{ delay: 42 }] },

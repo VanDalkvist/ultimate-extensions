@@ -30,7 +30,37 @@ cp -r extensions/<name> "$HOME/.ultimate/extensions/"
 cp -r extensions/<name> <project>/.ultimate/extensions/
 ```
 
-If that destination already exists (including a dangling symlink), inspect it first; do not overwrite it. Ultimate discovers the personal extension and rebuilds the web bundle; no server restart is needed. To uninstall, disable it in Ultimate or remove only the symlink you created.
+If that destination already exists (including a symlink), inspect its source before replacing it. Ultimate discovers the personal extension and rebuilds the web bundle; no server restart is needed. To uninstall, disable it in Ultimate or remove only the symlink you created.
+
+### Reinstall all extensions from this repository
+
+The collection installer updates copy-installed extensions in `~/.ultimate/extensions` and, when explicitly selected, existing project overrides. It leaves symlinks that already point to this checkout in place. It stages the source before replacing anything, backs up the previous folders, and keeps the backup outside Ultimate's extension discovery directory.
+
+Run from this repository:
+
+```sh
+# Initialize the VPN source dependency after a fresh clone
+git submodule update --init --recursive
+
+# Preview destinations; no files are changed
+bash scripts/reinstall-extensions.sh --dry-run
+
+# Apply personal copies; replace the path with your actual Ultimate checkout
+bash scripts/reinstall-extensions.sh --apply --ultimate-root /path/to/ultimate
+
+# Optional: also update overrides already present in a specific project
+bash scripts/reinstall-extensions.sh --apply --project-root /path/to/your-project --ultimate-root /path/to/ultimate
+
+# List saved restore points
+bash scripts/reinstall-extensions.sh --list-backups
+
+# Restore a specific backup ID printed by --apply
+bash scripts/reinstall-extensions.sh --rollback <backup-id>
+```
+
+Omit `--project-root` to update only personal extensions. `--ultimate-root` is used to recreate the Files extension's link to the host `node_modules` when no installed Files dependency link exists. The Terminal native `node_modules/node-pty` folder is preserved; use `--with-deps` only for a first install or an intentional dependency rebuild. Stop Terminal shells and quit/reload Ultimate around deployment. The Usage SQLite database, browser drafts, provider credentials, Mihomo daemon and Mihomo config are outside this installer's write scope.
+
+Backups are stored under `~/.ultimate/.extension-backups/<backup-id>`. Existing project override contents are backed up under `<project>/.ultimate/.extension-backups/<backup-id>`; keep both backup locations until rollback is no longer needed. Rollback also retains the newer copies under each backup's `after/` directory.
 
 [Terminal](extensions/terminal) needs `npm ci` inside its folder afterwards and a required macOS source build; follow its README using the host's Node. [Mihomo VPN](extensions/vpn) requires `git submodule update --init --recursive` and has its own safe installer/readiness check; initialize its dependency before copying it. Mihomo VPN targets the native Solid 2 facet API; it does not manage WireGuard tunnels. [Files](extensions/files) needs `pnpm install --frozen-lockfile` inside its folder for the editor and preview. The remaining extensions have no dependency installation.
 

@@ -97,3 +97,13 @@
 - **Fix pattern:** enumerate contractual behavior **before** syncing directories, preserve unrelated improvements, selectively restore last known-good source with immutable Git blob SHA, and add a local source admission test to detect accidental deletions. Always inspect install-time dependency closure and selected project/user duplicate.
 - **Do next time:** a rename or upstream Solid migration must migrate *all* existing host-specific behavior and tests, not just produce a compiling `web.solid.tsx`. Node/static checks do not prove a compiled macOS PTY/Usage product journey; label that gate BLOCKED until observed.
 - **Evidence:** `docs/arch-improvement/review-log.md` Cycle 8; `test/arch-loop-regressions.test.mjs`; `docs/superpowers/plans/2026-11-22-arch-improvement-cycle-8-post-solid-regression.md`.
+
+
+## 2026-11-24 — Collection-wide extension deployment and AI route isolation
+- The six extension sources currently live under `extensions/{files,right-panel-resize,subscription-usage,terminal,themes,vpn}`. A copy-installed user extension and a project-scoped extension of the same name are separate runtime copies; a project copy can shadow the user copy.
+- The collection installer should: default to dry-run; preflight all source trees and the VPN submodule; stage on the destination filesystem; back up before replacing; update only existing project overrides; preserve Files' host `node_modules` link, Terminal's native `node_modules/node-pty`, Usage SQLite, browser drafts, credentials and Mihomo runtime; and expose a manifest-bounded rollback.
+- Existing symlinks to the collection source are already live source links. Keep them untouched during copy deployment; switching the Git branch changes their source immediately.
+- AI traffic should have a separate selector populated from subscription providers, isolated from static general-purpose proxies. A shared general selector can include HTTP or other static endpoints with weaker transport properties.
+- A gate is active only while Mihomo global mode is `rule` and the correct selector is selected. A local Mihomo selector by itself does not prove that the operating system's TUN or kill switch is healthy.
+- Evidence: Cycle 9 plan and review log; `scripts/reinstall-extensions.sh`, `scripts/reinstall-extensions/{source-preflight,backup-rollback}.sh`, `extensions/vpn/scripts/install-ai-gate.sh`, and the VPN snapshot/service/panel tests.
+- Verification caveat: never record tests or a live Mihomo reload as passed until actually run on the target Mac/Ultimate host. Source inspection and authored assertions are separate evidence classes.

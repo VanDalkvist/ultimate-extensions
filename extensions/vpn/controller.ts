@@ -14,6 +14,11 @@ export function createController(connection: () => Promise<Connection>, fetcher:
     commands.tail = next.catch(() => undefined)
     return next
   }
+  const booleanArg = (args: unknown) => {
+    const enabled = commandArg(args, 'enabled')
+    if (typeof enabled !== 'boolean') throw new VpnError('invalid', 'enabled должен быть boolean')
+    return enabled
+  }
   return {
     async snapshot(args: unknown, ctx: Context): Promise<Snapshot> {
       noArgs(args)
@@ -23,7 +28,10 @@ export function createController(connection: () => Promise<Connection>, fetcher:
         const issue = error instanceof VpnError
           ? { code: error.code, message: error.message }
           : { code: 'api' as const, message: 'Не удалось прочитать состояние VPN' }
-        return { issue, enabled: false, mode: null, activeProxy: null, activeDelay: null, version: null, group: '', providers: [] }
+        return {
+          issue, enabled: false, mode: null, activeProxy: null, activeDelay: null,
+          version: null, group: '', providers: [], generalGate: null, aiGate: null, aiNodes: null, aiProxy: null,
+        }
       }
     },
     async select(args: unknown, ctx: Context) {
@@ -31,9 +39,12 @@ export function createController(connection: () => Promise<Connection>, fetcher:
       return queue(async () => (await service()).select(name, ctx.signal))
     },
     async power(args: unknown, ctx: Context) {
-      const enabled = commandArg(args, 'enabled')
-      if (typeof enabled !== 'boolean') throw new VpnError('invalid', 'enabled должен быть boolean')
+      const enabled = booleanArg(args)
       return queue(async () => (await service()).power(enabled, ctx.signal))
+    },
+    async aiPower(args: unknown, ctx: Context) {
+      const enabled = booleanArg(args)
+      return queue(async () => (await service()).aiPower(enabled, ctx.signal))
     },
     async probe(args: unknown, ctx: Context) {
       noArgs(args)

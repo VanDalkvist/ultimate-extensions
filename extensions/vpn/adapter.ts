@@ -1,5 +1,5 @@
-import { delay, mode, node, providers, record, selector, text } from './contracts.ts'
-import type { Snapshot, VpnPort } from './contracts.ts'
+import { AI_GATE, AI_NODES, GENERAL_GATE, delay, gateState, mode, node, providers, record, selector, text } from './contracts.ts'
+import type { GateName, Snapshot, VpnPort } from './contracts.ts'
 import type { MihomoClient } from './dependencies/mihomo-daemon/index.ts'
 
 export class MihomoAdapter implements VpnPort {
@@ -29,14 +29,20 @@ export class MihomoAdapter implements VpnPort {
       if (ungrouped.length) list.push({ id: '__configured__', name: 'Другие серверы', nodes: ungrouped })
       const currentMode = mode(record(config).mode)
       const currentNode = list.flatMap(p => p.nodes).find(n => n.name === selected.selected)
+      const generalGate = gateState(proxies, GENERAL_GATE)
+      const aiGate = gateState(proxies, AI_GATE)
+      const aiNodes = gateState(proxies, AI_NODES)
+      const generalViaProxy = generalGate
+        ? generalGate.selected === 'PROXY'
+        : selected.selected !== null && selected.selected !== 'DIRECT'
       return {
         issue: null, group, version: text(record(version).version), mode: currentMode,
-        enabled: currentMode !== 'direct' && selected.selected !== null && selected.selected !== 'DIRECT',
+        enabled: currentMode === 'rule' && generalViaProxy,
         activeProxy: selected.selected, activeDelay: currentNode?.delay ?? null, providers: list,
+        generalGate, aiGate, aiNodes, aiProxy: aiNodes?.selected ?? null,
       }
     } finally { abort.abort() }
   }
-
 
   async select(name: string, signal: AbortSignal): Promise<void> {
     await this.client.request(`/proxies/${encodeURIComponent(this.client.connection.group)}`, signal, 'PUT', { name })
@@ -44,6 +50,14 @@ export class MihomoAdapter implements VpnPort {
 
   async setMode(value: 'rule' | 'direct', signal: AbortSignal): Promise<void> {
     await this.client.request('/configs', signal, 'PATCH', { mode: value })
+  }
+
+  async setGate(group: typeof GENERAL_GATE | typeof AI_GATE, selected: 'PROXY' | 'DIRECT' | 'REJECT' | 'AI-NODES', signal: AbortSignal): Promise<void> {
+    await this.client.request(`/proxies/${encodeURIComponent(group)}`, signal, 'PUT', { name: selected })
+  }
+
+  async selectAiNode(name: string, signal: AbortSignal): Promise<void> {
+    await this.client.request('/proxies/AI-NODES', signal, 'PUT', { name })
   }
 
   async probe(signal: AbortSignal): Promise<Record<string, number | null>> {

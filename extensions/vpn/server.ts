@@ -16,7 +16,7 @@ function controller(ctx: ActionContext) {
 
 export default { name: 'vpn' }
 export const pollActions = ['snapshot']
-export const userActions = ['select', 'power', 'probe', 'openSettings']
+export const userActions = ['select', 'power', 'aiPower', 'probe', 'openSettings']
 export const actions = {
   settings: (args: unknown) => {
     noArgs(args)
@@ -42,5 +42,6 @@ export const actions = {
   snapshot: (args: unknown, ctx: ActionContext) => controller(ctx).snapshot(args, ctx),
   select: (args: unknown, ctx: ActionContext) => controller(ctx).select(args, ctx),
   power: (args: unknown, ctx: ActionContext) => controller(ctx).power(args, ctx),
+  aiPower: (args: unknown, ctx: ActionContext) => controller(ctx).aiPower(args, ctx),
   probe: (args: unknown, ctx: ActionContext) => controller(ctx).probe(args, ctx),
 }
