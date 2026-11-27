@@ -10,6 +10,13 @@ const Save = actionRef<{ path: string; secretText: string; version: string }, Sa
   'save',
 )
 
+const Rename = actionRef<{ path: string; destination: string; identity: string }, { path: string }>(
+  'files',
+  'rename',
+)
+
+const within = (path: string, root: string) => path === root || path.startsWith(`${root}/`)
+
 type Session = Buffers & { storageError?: string }
 const sessions = new Map<string, ReturnType<typeof createSession>>()
 
@@ -30,6 +37,9 @@ export function createSession(root: string) {
   const requests = new Set<number>()
   const timers = new Map<number, ReturnType<typeof setTimeout>>()
   const paused = new Set<number>()
+  let moving: { path: string; destination: string } | undefined
+  const reserved = (path: string) =>
+    !!moving && (within(path, moving.path) || within(path, moving.destination))
   function cancel(id: number) {
     clearTimeout(timers.get(id))
     timers.delete(id)
@@ -37,7 +47,15 @@ export function createSession(root: string) {
   function schedule(id: number) {
     cancel(id)
     const file = state.tabs.find((item) => item.id === id)
-    if (!file || paused.has(id) || file.loading || file.error || file.conflict || !dirty(file))
+    if (
+      !file ||
+      reserved(file.path) ||
+      paused.has(id) ||
+      file.loading ||
+      file.error ||
+      file.conflict ||
+      !dirty(file)
+    )
       return
     timers.set(
       id,
@@ -73,6 +91,7 @@ export function createSession(root: string) {
     const file = state.tabs.find((item) => item.id === id)
     if (
       !file ||
+      reserved(file.path) ||
       paused.has(id) ||
       file.loading ||
       file.saving ||
@@ -96,10 +115,53 @@ export function createSession(root: string) {
   }
   return {
     get: () => state,
+    isMoving: () => !!moving,
     subscribe: (listener: () => void) => {
       listeners.add(listener)
       return () => {
         listeners.delete(listener)
+      }
+    },
+    async rename(path: string, destination: string, identity: string) {
+      if (moving) throw new Error('Wait for the current rename to finish.')
+      if (path === destination) return
+      if (state.tabs.some((file) => within(file.path, destination)))
+        throw new Error('Close tabs at the new path before renaming.')
+      const affected = state.tabs.filter((file) => within(file.path, path))
+      if (affected.some((file) => file.loading || file.saving || paused.has(file.id)))
+        throw new Error('Finish loading, saving, or confirming changes in open tabs, then retry.')
+      if (affected.some((file) => file.conflict || (dirty(file) && (file.error || file.restored))))
+        throw new Error('Resolve or copy and reload the unsaved draft before renaming.')
+      moving = { path, destination }
+      for (const file of affected) cancel(file.id)
+      let renamed = false
+      try {
+        const opened = affected.find((file) => file.path === path)
+        const source = opened?.replacedIdentities?.includes(identity)
+          ? (opened.identity ?? identity)
+          : identity
+        await api.action(Rename, { path, destination, identity: source })
+        renamed = true
+      } finally {
+        moving = undefined
+        const remap = (name: string) =>
+          renamed && within(name, path) ? destination + name.slice(path.length) : name
+        update((current) => {
+          const moved = new Set(
+            current.tabs.filter((file) => within(file.path, path)).map((file) => remap(file.path)),
+          )
+          return {
+            ...current,
+            active: current.active === null ? null : remap(current.active),
+            tabs: current.tabs
+              .filter((file) => !renamed || !moved.has(file.path))
+              .map((file) => {
+                const nextPath = remap(file.path)
+                return nextPath === file.path ? file : { ...file, path: nextPath }
+              }),
+          }
+        })
+        for (const file of affected) schedule(file.id)
       }
     },
     open(path: string) {
@@ -118,7 +180,7 @@ export function createSession(root: string) {
     // A discard decision must stop the pending timer, not just the UI controls (#2840).
     pause(id: number) {
       const file = state.tabs.find((item) => item.id === id)
-      if (!file || file.saving) return false
+      if (!file || reserved(file.path) || file.saving) return false
       paused.add(id)
       cancel(id)
       return true
@@ -129,7 +191,7 @@ export function createSession(root: string) {
     },
     close(path: string) {
       const closing = state.tabs.find((item) => item.path === path)
-      if (!closing || closing.saving) return false
+      if (!closing || reserved(path) || closing.saving) return false
       cancel(closing.id)
       paused.delete(closing.id)
       update((current) => {
@@ -148,7 +210,7 @@ export function createSession(root: string) {
     },
     reload(path: string) {
       const reloading = state.tabs.find((item) => item.path === path)
-      if (!reloading || reloading.saving) return false
+      if (!reloading || reserved(path) || reloading.saving) return false
       cancel(reloading.id)
       paused.delete(reloading.id)
       update((current) => ({
@@ -159,7 +221,7 @@ export function createSession(root: string) {
     },
     load(tabs: FileBuffer[]) {
       for (const file of tabs) {
-        if (!file.loading || requests.has(file.id)) continue
+        if (!file.loading || reserved(file.path) || requests.has(file.id)) continue
         requests.add(file.id)
         void api
           .action(Read, { path: file.path })
@@ -186,7 +248,7 @@ export function session(root: string) {
   if (!sessions.size) {
     // Files may unmount on a surface switch while drafts or a save are still live (#2840).
     window.addEventListener('beforeunload', (event) => {
-      if ([...sessions.values()].some((item) => item.get().tabs.some(dirty))) {
+      if ([...sessions.values()].some((item) => item.isMoving() || item.get().tabs.some(dirty))) {
         event.preventDefault()
         event.returnValue = ''
       }

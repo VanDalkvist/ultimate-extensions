@@ -6,6 +6,8 @@ export type FileBuffer = {
   text: string
   base: string
   version: string
+  identity?: string
+  replacedIdentities?: string[]
   bytes: number
   loading: boolean
   saving: boolean
@@ -44,6 +46,8 @@ export function loaded(file: FileBuffer, result: FileResult): FileBuffer {
     text: result.secretText,
     base: result.secretText,
     version: result.version,
+    identity: result.identity,
+    replacedIdentities: undefined,
     bytes: result.bytes,
     loading: false,
     conflict: false,
@@ -61,6 +65,10 @@ export function saved(file: FileBuffer, text: string, result: SaveResult): FileB
     ...file,
     base: text,
     version: result.version,
+    identity: result.identity,
+    replacedIdentities: file.identity
+      ? [...(file.replacedIdentities ?? []), file.identity].slice(-32)
+      : file.replacedIdentities,
     bytes: result.bytes,
     saving: false,
     conflict: false,

@@ -24,6 +24,18 @@ export const fileRequests = {
   },
 }
 
+export function fileMarkdownLink(path: string): string {
+  const name = path.slice(path.lastIndexOf('/') + 1)
+  const label = name.replace(/[\\[\]\\`*_<>~!&]/g, '\\$&').replace(/\s/g, ' ')
+  const href = path
+    .split('/')
+    .map((segment) =>
+      encodeURIComponent(segment).replace(/[()]/g, (char) => (char === '(' ? '%28' : '%29')),
+    )
+    .join('/')
+  return `[${label}](#files/${href})`
+}
+
 export function fileLinkPath(href: string): string | null | undefined {
   if (!href.startsWith('#files/')) return undefined
   try {

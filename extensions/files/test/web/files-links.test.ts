@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { fileLinkPath, fileRequests } from '../../links.ts'
+import { fileLinkPath, fileMarkdownLink, fileRequests } from '../../links.ts'
 import { createSession } from '../../session.ts'
 import type { FileResult } from '../../types.ts'
 
@@ -27,7 +27,13 @@ it('requests Files before it mounts, then opens the requested tab without replac
   })
   const files = createSession('/host-project')
   const path = 'docs/plan v2.md'
-  fake.action.mockResolvedValue({ path, secretText: '# Original', version: 'v1', bytes: 10 })
+  fake.action.mockResolvedValue({
+    path,
+    secretText: '# Original',
+    version: 'v1',
+    identity: 'i1',
+    bytes: 10,
+  })
   files.open(path)
   files.load(files.get().tabs)
   await Promise.resolve()
@@ -52,6 +58,15 @@ it('requests Files before it mounts, then opens the requested tab without replac
   expect(files.get().tabs).toHaveLength(2)
   expect(files.get().tabs[0]).toMatchObject({ id: original.id, text: '# Local draft' })
   expect(fake.action).not.toHaveBeenCalled()
+})
+
+it('copies a Markdown link whose escaped label and encoded destination round-trip', () => {
+  const path = 'project notes/[start] (100% #1)!.md'
+  const link = fileMarkdownLink(path)
+  expect(link).toBe(
+    '[\\[start\\] (100% #1)\\!.md](#files/project%20notes/%5Bstart%5D%20%28100%25%20%231%29!.md)',
+  )
+  expect(fileLinkPath(link.slice(link.indexOf('](#files/') + 2, -1))).toBe(path)
 })
 
 it('leaves external and core conversation links untouched', () => {

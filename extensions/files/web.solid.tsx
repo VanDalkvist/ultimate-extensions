@@ -16,13 +16,13 @@ import {
   Header,
   Sidebar,
   StatusLine,
-  useAction,
   useExtensionUiState,
 } from '@/sdk/solid'
 import type { DirectoryResult } from './types.ts'
 import { dirty, type FileBuffer } from './buffers.ts'
 import { List, session } from './session.ts'
-import { Directory } from './tree.solid.tsx'
+import { ProjectTree } from './tree.solid.tsx'
+import { useFilesQuery } from './query.solid.tsx'
 import { MarkdownEditor } from './markdown-editor.solid.tsx'
 import { MarkdownPreview } from './markdown-preview.solid.tsx'
 import { previewReason } from './markdown-document.ts'
@@ -32,7 +32,7 @@ import { fileRequests } from './links.ts'
 function FilesSurface() {
   const [refresh, setRefresh] = createSignal(0)
   const [treeOpen, setTreeOpen] = createSignal(false)
-  const listing = useAction(List, { path: '' }, { on: refresh, focus: true })
+  const listing = useFilesQuery(List, () => ({ path: '' }), { on: refresh, focus: true })
   const refreshFiles = () => setRefresh((count) => count + 1)
   return (
     <>
@@ -54,7 +54,7 @@ function FilesSurface() {
             </Button>
           </Header>
           <Show
-            when={!listing.error()}
+            when={listing.data() || !listing.error()}
             fallback={
               <div
                 role="alert"
@@ -81,6 +81,8 @@ function FilesSurface() {
                     <Workspace
                       root={root}
                       listing={data()}
+                      listingError={listing.error()}
+                      listingLoading={listing.loading()}
                       treeOpen={treeOpen()}
                       setTreeOpen={setTreeOpen}
                       refresh={refresh()}
@@ -101,6 +103,8 @@ function FilesSurface() {
 function Workspace(props: {
   root: string
   listing: DirectoryResult
+  listingError: unknown
+  listingLoading: boolean
   treeOpen: boolean
   setTreeOpen: (open: boolean) => void
   refresh: number
@@ -125,8 +129,8 @@ function Workspace(props: {
   const activeId = createMemo(() => active()?.id)
   const markdown = () => /\.(md|mdx|markdown)$/i.test(activePath() ?? '')
   const showPreview = () => markdown() && preview()
-  const ready = () => !active()?.loading && !!active()?.version
-  let richEdit: { id: number; text: string } | undefined
+  const ready = createMemo(() => !active()?.loading && !!active()?.version)
+  let richEdit: { id: number; path: string; text: string } | undefined
   let releaseDiscard: (() => void) | undefined
 
   const openTarget = () => ({ current: files(), setTreeOpen: props.setTreeOpen })
@@ -160,12 +164,22 @@ function Workspace(props: {
     }
   })
   const previewIssue = createMemo(() => {
+    if (!ready() || !showPreview()) return undefined
     const path = activePath()
     const text = activeText()
     const id = activeId()
     if (path === undefined || text === undefined || !markdown()) return undefined
-    if (preview() && richEdit?.id === id && richEdit?.text === text) return undefined
+    if (richEdit?.id === id && richEdit?.path === path && richEdit?.text === text) return undefined
     return previewReason(path, text)
+  })
+
+  const savedText = createMemo(() => active()?.base)
+  const previewDescription = createMemo(() => {
+    const path = activePath()
+    const base = savedText()
+    if (!ready() || !markdown() || path === undefined || base === undefined) return undefined
+    const reason = showPreview() ? previewIssue() : previewReason(path, base)
+    return reason ? `Read-only Preview. ${reason}` : undefined
   })
 
   function discard(id: number, action: 'close' | 'reload') {
@@ -210,52 +224,89 @@ function Workspace(props: {
           )}
         >
           <Show when={state().tabs.length > 0}>
-            <div
-              aria-label="Open files"
-              class="flex shrink-0 overflow-x-auto border-b border-border/70"
-            >
-              <For each={state().tabs} keyed={(file) => file.id}>
-                {(file) => (
-                  <div
-                    class={cn(
-                      'group flex shrink-0 items-center border-r border-border/50',
-                      file().path === state().active && 'bg-accent/50',
-                    )}
-                  >
-                    <Button
-                      aria-label={`Activate ${file().path}`}
-                      aria-current={file().path === state().active ? 'page' : undefined}
+            <div class="flex shrink-0 border-b border-border/70">
+              <div aria-label="Open files" class="flex min-w-0 flex-1 overflow-x-auto">
+                <For each={state().tabs} keyed={(file) => file.id}>
+                  {(file) => (
+                    <div
                       class={cn(
-                        'max-w-64 gap-2 rounded-none border-b-2 border-transparent px-3 py-2 font-mono text-[11.5px] font-normal text-muted-foreground hover:text-foreground',
-                        file().path === state().active && 'border-brand text-foreground',
+                        'group flex shrink-0 items-center border-r border-border/50',
+                        file().path === state().active && 'bg-accent/50',
                       )}
-                      onClick={() => openFile(file().path)}
-                      title={file().path}
-                      size={null}
-                      variant={null}
                     >
-                      <FileIcon class="size-3 shrink-0" />
-                      <span class="truncate">{file().path.split('/').at(-1)}</span>
-                      {dirty(file()) && (
-                        <span
-                          aria-label="Modified"
-                          class="size-1.5 shrink-0 rounded-full bg-brand"
-                        />
-                      )}
-                    </Button>
+                      <Button
+                        aria-label={`Activate ${file().path}`}
+                        aria-current={file().path === state().active ? 'page' : undefined}
+                        class={cn(
+                          'max-w-64 gap-2 rounded-none border-b-2 border-transparent px-3 py-2 font-mono text-[11.5px] font-normal text-muted-foreground hover:text-foreground',
+                          file().path === state().active && 'border-brand text-foreground',
+                        )}
+                        onClick={() => openFile(file().path)}
+                        title={file().path}
+                        size={null}
+                        variant={null}
+                      >
+                        <FileIcon class="size-3 shrink-0" />
+                        <span class="truncate">{file().path.split('/').at(-1)}</span>
+                        {dirty(file()) && (
+                          <span
+                            aria-label="Modified"
+                            class="size-1.5 shrink-0 rounded-full bg-brand"
+                          />
+                        )}
+                      </Button>
+                      <Button
+                        aria-label={`Close ${file().path}`}
+                        class="mr-1 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        disabled={file().saving}
+                        onClick={() => discard(file().id, 'close')}
+                        size={null}
+                        variant={null}
+                      >
+                        <XIcon class="size-3" />
+                      </Button>
+                    </div>
+                  )}
+                </For>
+              </div>
+              <Show when={active()}>
+                {(file) => (
+                  <div class="flex shrink-0 items-center gap-1 border-l border-border/50 px-2">
+                    <Show when={markdown() && ready()}>
+                      <SegmentedControl
+                        aria-label="Document view"
+                        class="gap-0.5"
+                        bind={[documentView, changeView]}
+                      >
+                        <SegmentedControlItem
+                          value="preview"
+                          class="h-auto rounded px-2 py-1 font-sans"
+                          aria-description={previewDescription()}
+                          title={previewDescription() ?? 'Show formatted Markdown'}
+                        >
+                          Preview
+                        </SegmentedControlItem>
+                        <SegmentedControlItem
+                          value="source"
+                          class="h-auto rounded px-2 py-1 font-sans"
+                        >
+                          Source
+                        </SegmentedControlItem>
+                      </SegmentedControl>
+                    </Show>
                     <Button
-                      aria-label={`Close ${file().path}`}
-                      class="mr-1 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                      disabled={file().saving}
-                      onClick={() => discard(file().id, 'close')}
-                      size={null}
-                      variant={null}
+                      aria-label="Reload from disk"
+                      title="Reload from disk"
+                      disabled={file().loading || file().saving}
+                      onClick={() => discard(file().id, 'reload')}
+                      size="icon-sm"
+                      variant="ghost"
                     >
-                      <XIcon class="size-3" />
+                      <RefreshCwIcon class="size-3.5" />
                     </Button>
                   </div>
                 )}
-              </For>
+              </Show>
             </div>
           </Show>
           <Show
@@ -281,49 +332,6 @@ function Workspace(props: {
           >
             {(file) => (
               <>
-                <div class="flex min-w-0 flex-wrap items-center gap-2 border-b border-border/70 px-3 py-2">
-                  <span
-                    class="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground"
-                    title={file().path}
-                  >
-                    {file().path}
-                  </span>
-                  <Show when={markdown() && ready()}>
-                    <SegmentedControl
-                      aria-label="Document view"
-                      class="gap-0.5"
-                      bind={[documentView, changeView]}
-                    >
-                      <SegmentedControlItem
-                        value="preview"
-                        class="h-auto rounded px-2 py-1 font-sans"
-                        title={
-                          previewIssue()
-                            ? 'Read-only Preview; edit in Source to preserve syntax.'
-                            : undefined
-                        }
-                      >
-                        Preview
-                      </SegmentedControlItem>
-                      <SegmentedControlItem
-                        value="source"
-                        class="h-auto rounded px-2 py-1 font-sans"
-                      >
-                        Source
-                      </SegmentedControlItem>
-                    </SegmentedControl>
-                  </Show>
-                  <Button
-                    aria-label="Reload from disk"
-                    disabled={file().loading || file().saving}
-                    onClick={() => discard(file().id, 'reload')}
-                    size="icon-sm"
-                    variant="ghost"
-                  >
-                    <RefreshCwIcon class="size-3.5" />
-                  </Button>
-                  <span class="font-mono text-[10.5px] text-muted-foreground">Autosave</span>
-                </div>
                 {file().conflict && (
                   <div
                     role="alert"
@@ -365,11 +373,6 @@ function Workspace(props: {
                         Resume autosave
                       </Button>
                     )}
-                  </output>
-                )}
-                {previewIssue() && ready() && (
-                  <output class="block border-b border-border/70 px-3 py-2 text-[11px] text-muted-foreground">
-                    Preview is read-only for this document. Edit in Source to preserve its syntax.
                   </output>
                 )}
                 <Show
@@ -414,7 +417,7 @@ function Workspace(props: {
                                     path={file().path}
                                     value={file().text}
                                     onChange={(text) => {
-                                      richEdit = { id, text }
+                                      richEdit = { id, path: file().path, text }
                                       files().edit(id, text)
                                     }}
                                   />
@@ -452,29 +455,17 @@ function Workspace(props: {
             props.treeOpen ? 'flex' : 'max-md:hidden',
           )}
         >
-          <div class="flex shrink-0 items-center justify-between border-b border-border/70 px-3 py-2">
-            <span class="section-label">Project files</span>
-            <Button
-              aria-label="Refresh files"
-              onClick={() => props.onRefresh()}
-              size="icon-sm"
-              variant="ghost"
-            >
-              <RefreshCwIcon class="size-3.5" />
-            </Button>
-          </div>
-          <div class="min-h-0 flex-1 overflow-auto p-1.5">
-            <Directory
-              path=""
-              selected={state().active}
-              refresh={props.refresh}
-              openFile={openFile}
-              data={props.listing}
-            />
-          </div>
-          <p class="border-t border-border/70 px-3 py-2 text-[10.5px] leading-relaxed text-muted-foreground/60">
-            Generated folders and credentials are excluded. Text files up to 512 KiB.
-          </p>
+          <ProjectTree
+            selected={state().active}
+            refresh={props.refresh}
+            openFile={openFile}
+            onCreated={openFile}
+            onRefresh={props.onRefresh}
+            onRename={(path, destination, identity) => files().rename(path, destination, identity)}
+            data={props.listing}
+            loading={props.listingLoading}
+            error={props.listingError}
+          />
         </aside>
       </div>
       <Dialog

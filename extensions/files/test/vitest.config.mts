@@ -7,6 +7,7 @@ const runtime = process.env.ULTIMATE_CLONE
   ? resolvePath(process.env.ULTIMATE_CLONE)
   : fileURLToPath(new URL('../../../../', import.meta.url))
 const root = fileURLToPath(new URL('..', import.meta.url))
+const server = { fs: { allow: [root, runtime] } }
 const resolve = {
   alias: [
     { find: '@', replacement: join(runtime, 'web/src') },
@@ -15,10 +16,12 @@ const resolve = {
 }
 
 export default defineConfig({
+  root,
   test: {
     projects: [
       {
         root,
+        server,
         resolve,
         test: {
           include: ['test/**/*.test.ts'],
@@ -27,6 +30,7 @@ export default defineConfig({
       },
       {
         root,
+        server,
         resolve,
         plugins: [
           solid({
@@ -39,6 +43,7 @@ export default defineConfig({
         ],
         test: {
           environment: 'jsdom',
+          server: { deps: { inline: [/solid-js/, /@solidjs\/web/, /@ui-sdk\/solid/] } },
           include: ['test/**/*.test.solid.tsx'],
           setupFiles: [join(runtime, 'test/web/solid-dom-setup.ts')],
         },

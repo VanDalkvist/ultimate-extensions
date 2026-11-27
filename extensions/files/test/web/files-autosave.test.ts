@@ -35,7 +35,13 @@ it('autosaves after typing pauses, serializes newer edits and stops on conflict'
   }
   fake.action.mockImplementation((ref: { name: string }) => {
     if (ref.name === 'read')
-      return Promise.resolve({ path: 'notes.md', secretText: 'A', version: 'v1', bytes: 1 })
+      return Promise.resolve({
+        path: 'notes.md',
+        secretText: 'A',
+        version: 'v1',
+        identity: 'i1',
+        bytes: 1,
+      })
     return new Promise<SaveResult>((resolve) => {
       finish = resolve
     })
@@ -60,7 +66,7 @@ it('autosaves after typing pauses, serializes newer edits and stops on conflict'
   files.edit(id, 'C')
   await vi.advanceTimersByTimeAsync(1000)
   expect(fake.action.mock.calls.filter(([ref]) => ref.name === 'save')).toHaveLength(1)
-  finish({ status: 'saved', version: 'v2', bytes: 8 })
+  finish({ status: 'saved', version: 'v2', identity: 'i2', bytes: 8 })
   await vi.advanceTimersByTimeAsync(700)
   expect(fake.action.mock.calls.filter(([ref]) => ref.name === 'save')).toHaveLength(2)
   expect(fake.action.mock.lastCall?.[1]).toMatchObject({ secretText: 'C', version: 'v2' })
@@ -85,7 +91,13 @@ it('pauses autosave for discard confirmation and refuses to discard an in-flight
   }
   fake.action.mockImplementation((ref: { name: string }) =>
     ref.name === 'read'
-      ? Promise.resolve({ path: 'notes.md', secretText: 'A', version: 'v1', bytes: 1 })
+      ? Promise.resolve({
+          path: 'notes.md',
+          secretText: 'A',
+          version: 'v1',
+          identity: 'i1',
+          bytes: 1,
+        })
       : new Promise<SaveResult>((resolve) => {
           finish = resolve
         }),
@@ -106,7 +118,7 @@ it('pauses autosave for discard confirmation and refuses to discard an in-flight
   expect(files.close('notes.md')).toBe(false)
   expect(files.reload('notes.md')).toBe(false)
   expect(createSession('/project').get().tabs[0]).toMatchObject({ text: 'B', unconfirmed: true })
-  finish({ status: 'saved', version: 'v2', bytes: 1 })
+  finish({ status: 'saved', version: 'v2', identity: 'i2', bytes: 1 })
   await vi.advanceTimersByTimeAsync(0)
   files.edit(id, 'C discarded before saving')
   expect(files.pause(id)).toBe(true)
@@ -121,7 +133,13 @@ it('keeps errors and recovered drafts local until an explicit retry', async () =
   storage()
   fake.action.mockImplementation((ref: { name: string }) =>
     ref.name === 'read'
-      ? Promise.resolve({ path: 'notes.md', secretText: 'A', version: 'v1', bytes: 1 })
+      ? Promise.resolve({
+          path: 'notes.md',
+          secretText: 'A',
+          version: 'v1',
+          identity: 'i1',
+          bytes: 1,
+        })
       : Promise.reject(new Error('Connection lost')),
   )
   const files = createSession('/project')
@@ -144,7 +162,7 @@ it('keeps errors and recovered drafts local until an explicit retry', async () =
   await vi.advanceTimersByTimeAsync(5000)
   expect(fake.action.mock.calls.filter(([ref]) => ref.name === 'save')).toHaveLength(1)
   expect(recovered.get().tabs[0]).toMatchObject({ text: 'C', restored: true, unconfirmed: true })
-  fake.action.mockResolvedValue({ status: 'saved', version: 'v2', bytes: 1 })
+  fake.action.mockResolvedValue({ status: 'saved', version: 'v2', identity: 'i2', bytes: 1 })
   recovered.retry(recovered.get().tabs[0].id)
   await vi.advanceTimersByTimeAsync(0)
   expect(fake.action.mock.calls.filter(([ref]) => ref.name === 'save')).toHaveLength(2)
